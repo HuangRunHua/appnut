@@ -1,0 +1,48 @@
+[workspace]
+members = [
+    "crates/bff/runtime",
+    "crates/bff/derive",
+    "crates/bff/ffi",
+    "crates/dsl/types",
+    "crates/dsl/client",
+    "crates/dsl/store",
+    "crates/dsl/macro",
+    "crates/dsl/web",
+    "crates/support/core",
+    "crates/support/blob",
+    "crates/support/kv",
+    "crates/support/sql",
+    "crates/support/search",
+    "example/rust",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[workspace.dependencies]
+anyhow = "1"
+async-trait = "0.1"
+axum = "0.8"
+base64 = "0.22"
+chrono = { version = "0.4", features = ["serde"] }
+flatbuffers = "25"
+jsonwebtoken = "9"
+proc-macro2 = "1"
+quote = "1"
+redb = "2"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+syn = { version = "2", features = ["full", "extra-traits", "parsing"] }
+tantivy = "0.22"
+tempfile = "3"
+thiserror = "2"
+tokio = { version = "1", features = ["full"] }
+tower = { version = "0.5", features = ["util"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1", features = ["v4", "serde"] }

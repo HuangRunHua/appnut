@@ -1,0 +1,24 @@
+[package]
+name = "openerp-store"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "openerp_store"
+path = "src/lib.rs"
+
+[dependencies]
+axum.workspace = true
+chrono.workspace = true
+flatbuffers.workspace = true
+openerp-core = { path = "../../support/core" }
+openerp-kv = { path = "../../support/kv" }
+openerp-search = { path = "../../support/search" }
+openerp-sql = { path = "../../support/sql" }
+openerp-types = { path = "../types" }
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

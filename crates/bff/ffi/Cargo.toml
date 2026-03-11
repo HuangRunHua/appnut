@@ -1,0 +1,29 @@
+[package]
+name = "flux-ffi"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "flux_ffi"
+path = "src/lib.rs"
+
+[dependencies]
+axum.workspace = true
+base64.workspace = true
+chrono.workspace = true
+flux-golden = { path = "../../../example/rust" }
+openerp-blob = { path = "../../support/blob" }
+openerp-client = { path = "../../dsl/client" }
+openerp-core = { path = "../../support/core" }
+openerp-flux = { path = "../runtime" }
+openerp-kv = { path = "../../support/kv" }
+openerp-store = { path = "../../dsl/store" }
+openerp-types = { path = "../../dsl/types" }
+openerp-web = { path = "../../dsl/web" }
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
+tokio.workspace = true
+tracing.workspace = true

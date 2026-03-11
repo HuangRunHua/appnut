@@ -1,0 +1,15 @@
+[package]
+name = "flux-derive"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "flux_derive"
+path = "src/lib.rs"
+proc-macro = true
+
+[dependencies]
+proc-macro2.workspace = true
+quote.workspace = true
+syn.workspace = true

@@ -1,0 +1,9 @@
+[package]
+name = "openerp-web"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "openerp_web"
+path = "src/lib.rs"

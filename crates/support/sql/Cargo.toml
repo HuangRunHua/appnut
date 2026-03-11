@@ -1,0 +1,13 @@
+[package]
+name = "openerp-sql"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "openerp_sql"
+path = "src/lib.rs"
+
+[dependencies]
+rusqlite.workspace = true
+thiserror.workspace = true

@@ -1,0 +1,12 @@
+[package]
+name = "openerp-flux"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "openerp_flux"
+path = "src/lib.rs"
+
+[dev-dependencies]
+tokio.workspace = true

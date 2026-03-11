@@ -1,0 +1,20 @@
+[package]
+name = "openerp-client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "openerp_client"
+path = "src/lib.rs"
+
+[dependencies]
+async-trait.workspace = true
+chrono.workspace = true
+flatbuffers.workspace = true
+openerp-types = { path = "../types" }
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
