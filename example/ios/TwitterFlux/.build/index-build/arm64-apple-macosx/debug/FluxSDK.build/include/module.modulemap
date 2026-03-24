@@ -1,0 +1,3 @@
+module FluxSDK {
+    header "/Users/runhuahuang/GitHub/appnut/example/ios/TwitterFlux/.build/index-build/arm64-apple-macosx/debug/FluxSDK.build/include/FluxSDK-Swift.h"
+}

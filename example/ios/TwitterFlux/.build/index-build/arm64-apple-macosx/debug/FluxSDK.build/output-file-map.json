@@ -1,0 +1,19 @@
+{
+  "": {
+    "swift-dependencies": "/Users/runhuahuang/GitHub/appnut/example/ios/TwitterFlux/.build/index-build/arm64-apple-macosx/debug/FluxSDK.build/master.swiftdeps"
+  },
+  "/Users/runhuahuang/GitHub/appnut/example/ios/FluxSDK/Sources/FluxClient.swift": {
+    "dependencies": "/Users/runhuahuang/GitHub/appnut/example/ios/TwitterFlux/.build/index-build/arm64-apple-macosx/debug/FluxSDK.build/FluxClient.d",
+    "object": "/Users/runhuahuang/GitHub/appnut/example/ios/TwitterFlux/.build/index-build/arm64-apple-macosx/debug/FluxSDK.build/FluxClient.swift.o",
+    "swiftmodule": "/Users/runhuahuang/GitHub/appnut/example/ios/TwitterFlux/.build/index-build/arm64-apple-macosx/debug/FluxSDK.build/FluxClient~partial.swiftmodule",
+    "swift-dependencies": "/Users/runhuahuang/GitHub/appnut/example/ios/TwitterFlux/.build/index-build/arm64-apple-macosx/debug/FluxSDK.build/FluxClient.swiftdeps",
+    "diagnostics": "/Users/runhuahuang/GitHub/appnut/example/ios/TwitterFlux/.build/index-build/arm64-apple-macosx/debug/FluxSDK.build/FluxClient.dia"
+  },
+  "/Users/runhuahuang/GitHub/appnut/example/ios/FluxSDK/Sources/FluxStore.swift": {
+    "dependencies": "/Users/runhuahuang/GitHub/appnut/example/ios/TwitterFlux/.build/index-build/arm64-apple-macosx/debug/FluxSDK.build/FluxStore.d",
+    "object": "/Users/runhuahuang/GitHub/appnut/example/ios/TwitterFlux/.build/index-build/arm64-apple-macosx/debug/FluxSDK.build/FluxStore.swift.o",
+    "swiftmodule": "/Users/runhuahuang/GitHub/appnut/example/ios/TwitterFlux/.build/index-build/arm64-apple-macosx/debug/FluxSDK.build/FluxStore~partial.swiftmodule",
+    "swift-dependencies": "/Users/runhuahuang/GitHub/appnut/example/ios/TwitterFlux/.build/index-build/arm64-apple-macosx/debug/FluxSDK.build/FluxStore.swiftdeps",
+    "diagnostics": "/Users/runhuahuang/GitHub/appnut/example/ios/TwitterFlux/.build/index-build/arm64-apple-macosx/debug/FluxSDK.build/FluxStore.dia"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "object" : {
+    "artifacts" : [
+      {
+        "kind" : {
+          "xcframework" : {
+
+          }
+        },
+        "packageRef" : {
+          "identity" : "fluxsdk",
+          "kind" : "fileSystem",
+          "location" : "/Users/runhuahuang/GitHub/appnut/example/ios/FluxSDK",
+          "name" : "FluxSDK"
+        },
+        "path" : "/Users/runhuahuang/GitHub/appnut/target/ios/FluxFFI.xcframework",
+        "source" : {
+          "type" : "local"
+        },
+        "targetName" : "FluxFFI"
+      }
+    ],
+    "dependencies" : [
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "fluxsdk",
+          "kind" : "fileSystem",
+          "location" : "/Users/runhuahuang/GitHub/appnut/example/ios/FluxSDK",
+          "name" : "FluxSDK"
+        },
+        "state" : {
+          "name" : "fileSystem",
+          "path" : "/Users/runhuahuang/GitHub/appnut/example/ios/FluxSDK"
+        },
+        "subpath" : "fluxsdk"
+      }
+    ],
+    "prebuilts" : [
+
+    ]
+  },
+  "version" : 7
+}
