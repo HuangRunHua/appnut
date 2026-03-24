@@ -371,17 +371,11 @@ dependencies = [
  "axum",
  "base64",
  "chrono",
- "flux-golden",
  "openerp-blob",
- "openerp-client",
  "openerp-core",
  "openerp-flux",
  "openerp-kv",
- "openerp-store",
- "openerp-types",
  "openerp-web",
- "reqwest",
- "serde",
  "serde_json",
  "tempfile",
  "tokio",
@@ -399,6 +393,7 @@ dependencies = [
  "chrono",
  "flatbuffers",
  "flux-derive",
+ "flux-ffi",
  "jsonwebtoken",
  "openerp-blob",
  "openerp-client",
@@ -1184,6 +1179,8 @@ dependencies = [
 name = "openerp-flux"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
  "tokio",
 ]
 

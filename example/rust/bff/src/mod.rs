@@ -480,7 +480,7 @@ impl TwitterBff {
     pub async fn handle_compose_update(&self, req: &ComposeUpdateReq, store: &StateStore) {
         let mut state = store
             .get(ComposeState::PATH)
-            .and_then(|v| v.downcast_ref::<ComposeState>().cloned())
+            .and_then(|v| serde_json::from_slice::<ComposeState>(&v).ok())
             .unwrap_or_else(ComposeState::empty);
         if req.field.as_str() == "content" {
             state.content = req.value.clone()
@@ -609,7 +609,7 @@ impl TwitterBff {
                     },
                 );
             }
-            Err(e) => {
+            Err(_e) => {
                 store.set(
                     SettingsState::PATH,
                     SettingsState {
@@ -617,7 +617,7 @@ impl TwitterBff {
                         bio: req.bio.clone(),
                         busy: false,
                         saved: false,
-                        error: Some(e.to_string()),
+                        error: Some(_e.to_string()),
                     },
                 );
             }

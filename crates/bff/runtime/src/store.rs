@@ -1,29 +1,34 @@
-use std::any::Any;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
 
+use serde::Serialize;
+
 use crate::trie::Trie;
-use crate::value::{StateValue, SubscriptionId};
+use crate::value::SubscriptionId;
 
 /// Callback type for state change notifications.
-pub type ChangeHandler = Arc<dyn Fn(&str, &StateValue) + Send + Sync>;
+///
+/// Receives the changed path and the JSON-serialized bytes of the new value.
+pub type ChangeHandler = Arc<dyn Fn(&str, &[u8]) + Send + Sync>;
 
 /// Per-path state store with Trie-based subscription routing.
 ///
-/// - `set(path, value)` stores a value and notifies all matching subscribers.
-/// - `get(path)` reads the current value (Arc clone, cheap).
+/// All values are stored as JSON bytes (`Vec<u8>`). This decouples the store
+/// from concrete business types — callers serialize on write and deserialize
+/// on read.
+///
+/// - `set(path, value)` serializes `value` to JSON and stores the bytes.
+/// - `set_bytes(path, bytes)` stores pre-serialized bytes directly.
+/// - `get(path)` returns the stored JSON bytes.
 /// - `scan(prefix)` lists all children under a prefix path.
 /// - `subscribe(pattern, handler)` registers a change handler.
 /// - `unsubscribe(pattern, id)` removes a handler.
 ///
 /// Uses `BTreeMap` internally for ordered prefix scanning.
 pub struct StateStore {
-    /// Current state values, keyed by exact path. BTreeMap for ordered scan.
-    values: RwLock<BTreeMap<String, StateValue>>,
-    /// Trie mapping subscription patterns to handler entries.
+    values: RwLock<BTreeMap<String, Vec<u8>>>,
     handlers: Trie<HandlerEntry>,
-    /// Monotonic counter for subscription IDs.
     next_id: AtomicU64,
 }
 
@@ -43,39 +48,44 @@ impl StateStore {
         }
     }
 
-    /// Set a typed value at the given path and notify matching subscribers.
+    /// Serialize `value` to JSON bytes and store at the given path.
     ///
-    /// Wraps the value in `StateValue` (Arc) internally.
-    pub fn set<T: Any + Send + Sync>(&self, path: &str, value: T) {
-        self.set_value(path, StateValue::new(value));
+    /// Notifies all subscribers whose pattern matches this path.
+    ///
+    /// # Panics
+    ///
+    /// Panics if serialization fails (should not happen for valid `Serialize` types).
+    pub fn set<T: Serialize>(&self, path: &str, value: T) {
+        let bytes = serde_json::to_vec(&value).expect("StateStore::set: serialization failed");
+        self.set_bytes(path, bytes);
     }
 
-    /// Set a pre-built StateValue at the given path and notify matching subscribers.
-    pub fn set_value(&self, path: &str, value: StateValue) {
+    /// Store pre-serialized JSON bytes at the given path.
+    ///
+    /// Notifies all subscribers whose pattern matches this path.
+    pub fn set_bytes(&self, path: &str, bytes: Vec<u8>) {
         {
             let mut values = self.values.write().unwrap();
-            values.insert(path.to_string(), value.clone());
+            values.insert(path.to_string(), bytes.clone());
         }
-        // Notify all subscribers whose pattern matches this path.
         let entries = self.handlers.match_topic(path);
         for entry in entries {
-            (entry.handler)(path, &value);
+            (entry.handler)(path, &bytes);
         }
     }
 
-    /// Get the current state value at the given path.
+    /// Get the stored JSON bytes at the given path.
     ///
-    /// Returns a cloned `StateValue` (Arc clone, cheap — no data copy).
     /// Returns `None` if no value is set at this path.
-    pub fn get(&self, path: &str) -> Option<StateValue> {
+    pub fn get(&self, path: &str) -> Option<Vec<u8>> {
         let values = self.values.read().unwrap();
         values.get(path).cloned()
     }
 
-    /// Remove the state value at the given path.
+    /// Remove the value at the given path.
     ///
-    /// Returns the old value if present. Does NOT notify subscribers.
-    pub fn remove(&self, path: &str) -> Option<StateValue> {
+    /// Returns the old JSON bytes if present. Does NOT notify subscribers.
+    pub fn remove(&self, path: &str) -> Option<Vec<u8>> {
         let mut values = self.values.write().unwrap();
         values.remove(path)
     }
@@ -84,10 +94,7 @@ impl StateStore {
     ///
     /// Does NOT include the exact `prefix` path itself — only children.
     /// Results are ordered by path (BTreeMap ordering).
-    ///
-    /// Example: `scan("home/devices/items")` returns entries at
-    /// `home/devices/items/1`, `home/devices/items/2`, etc.
-    pub fn scan(&self, prefix: &str) -> Vec<(String, StateValue)> {
+    pub fn scan(&self, prefix: &str) -> Vec<(String, Vec<u8>)> {
         let values = self.values.read().unwrap();
         let scan_prefix = format!("{}/", prefix);
         values
@@ -116,13 +123,14 @@ impl StateStore {
 
     /// Subscribe to state changes matching the given Trie pattern.
     ///
-    /// The handler is called synchronously whenever `set` or `set_value`
-    /// is called on a path that matches the pattern.
+    /// The handler is called synchronously whenever `set` or `set_bytes`
+    /// is called on a path that matches the pattern. The handler receives
+    /// the path and the JSON bytes of the new value.
     ///
     /// Returns a `SubscriptionId` that can be used to unsubscribe.
     pub fn subscribe<F>(&self, pattern: &str, handler: F) -> SubscriptionId
     where
-        F: Fn(&str, &StateValue) + Send + Sync + 'static,
+        F: Fn(&str, &[u8]) + Send + Sync + 'static,
     {
         let id = SubscriptionId(self.next_id.fetch_add(1, Ordering::Relaxed));
         let entry = HandlerEntry {
@@ -138,10 +146,10 @@ impl StateStore {
         self.handlers.remove(pattern, |entry| entry.id == id);
     }
 
-    /// Get a snapshot of all paths and values.
+    /// Get a snapshot of all paths and JSON bytes.
     ///
     /// Returns entries ordered by path.
-    pub fn snapshot(&self) -> Vec<(String, StateValue)> {
+    pub fn snapshot(&self) -> Vec<(String, Vec<u8>)> {
         let values = self.values.read().unwrap();
         values.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
     }
@@ -162,6 +170,7 @@ impl Default for StateStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde::{Deserialize, Serialize};
     use std::sync::atomic::AtomicU64;
 
     // ========================================================================
@@ -173,22 +182,24 @@ mod tests {
         let store = StateStore::new();
         store.set("counter", 42u32);
 
-        let v = store.get("counter").unwrap();
-        assert_eq!(v.downcast_ref::<u32>(), Some(&42));
+        let bytes = store.get("counter").unwrap();
+        let v: u32 = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(v, 42);
     }
 
     #[test]
     fn set_and_get_string() {
         let store = StateStore::new();
-        store.set("name", "hello".to_string());
+        store.set("name", "hello");
 
-        let v = store.get("name").unwrap();
-        assert_eq!(v.downcast_ref::<String>(), Some(&"hello".to_string()));
+        let bytes = store.get("name").unwrap();
+        let v: String = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(v, "hello");
     }
 
     #[test]
     fn set_and_get_struct() {
-        #[derive(Debug, PartialEq)]
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
         struct AuthState {
             phase: String,
             busy: bool,
@@ -203,8 +214,8 @@ mod tests {
             },
         );
 
-        let v = store.get("auth/state").unwrap();
-        let state = v.downcast_ref::<AuthState>().unwrap();
+        let bytes = store.get("auth/state").unwrap();
+        let state: AuthState = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(state.phase, "authenticated");
         assert!(!state.busy);
     }
@@ -221,47 +232,42 @@ mod tests {
         store.set("counter", 1u32);
         store.set("counter", 2u32);
 
-        let v = store.get("counter").unwrap();
-        assert_eq!(v.downcast_ref::<u32>(), Some(&2));
+        let bytes = store.get("counter").unwrap();
+        let v: u32 = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(v, 2);
     }
 
     #[test]
     fn set_overwrites_different_type() {
         let store = StateStore::new();
         store.set("value", 42u32);
-        store.set("value", "now a string".to_string());
+        store.set("value", "now a string");
 
-        let v = store.get("value").unwrap();
-        assert_eq!(v.downcast_ref::<u32>(), None);
-        assert_eq!(
-            v.downcast_ref::<String>(),
-            Some(&"now a string".to_string())
-        );
+        let bytes = store.get("value").unwrap();
+        assert!(serde_json::from_slice::<u32>(&bytes).is_err());
+        let v: String = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(v, "now a string");
     }
 
     #[test]
-    fn get_returns_arc_clone_not_data_clone() {
+    fn get_returns_valid_json_bytes() {
         let store = StateStore::new();
-        let big = vec![0u8; 1_000_000];
-        store.set("big", big);
+        store.set("list", vec![1u32, 2, 3]);
 
-        let v1 = store.get("big").unwrap();
-        let v2 = store.get("big").unwrap();
-
-        // Both point to the same underlying data (Arc shared).
-        let p1 = v1.downcast_ref::<Vec<u8>>().unwrap().as_ptr();
-        let p2 = v2.downcast_ref::<Vec<u8>>().unwrap().as_ptr();
-        assert_eq!(p1, p2);
+        let bytes = store.get("list").unwrap();
+        let v: Vec<u32> = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(v, vec![1, 2, 3]);
     }
 
     #[test]
-    fn set_value_prebuilt() {
+    fn set_bytes_prebuilt() {
         let store = StateStore::new();
-        let sv = StateValue::new(42u32);
-        store.set_value("counter", sv.clone());
+        let bytes = serde_json::to_vec(&42u32).unwrap();
+        store.set_bytes("counter", bytes);
 
-        let v = store.get("counter").unwrap();
-        assert_eq!(v.downcast_ref::<u32>(), Some(&42));
+        let got = store.get("counter").unwrap();
+        let v: u32 = serde_json::from_slice(&got).unwrap();
+        assert_eq!(v, 42);
     }
 
     // ========================================================================
@@ -274,7 +280,8 @@ mod tests {
         store.set("counter", 42u32);
 
         let old = store.remove("counter").unwrap();
-        assert_eq!(old.downcast_ref::<u32>(), Some(&42));
+        let v: u32 = serde_json::from_slice(&old).unwrap();
+        assert_eq!(v, 42);
         assert!(store.get("counter").is_none());
     }
 
@@ -291,10 +298,9 @@ mod tests {
         store.remove("counter");
         store.set("counter", 2u32);
 
-        assert_eq!(
-            store.get("counter").unwrap().downcast_ref::<u32>(),
-            Some(&2)
-        );
+        let bytes = store.get("counter").unwrap();
+        let v: u32 = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(v, 2);
     }
 
     // ========================================================================
@@ -304,32 +310,28 @@ mod tests {
     #[test]
     fn scan_returns_children() {
         let store = StateStore::new();
-        store.set("home/devices/items/1", "device-1".to_string());
-        store.set("home/devices/items/2", "device-2".to_string());
-        store.set("home/devices/items/3", "device-3".to_string());
+        store.set("home/devices/items/1", "device-1");
+        store.set("home/devices/items/2", "device-2");
+        store.set("home/devices/items/3", "device-3");
 
         let results = store.scan("home/devices/items");
         assert_eq!(results.len(), 3);
-        assert_eq!(
-            results[0].1.downcast_ref::<String>(),
-            Some(&"device-1".to_string())
-        );
-        assert_eq!(
-            results[1].1.downcast_ref::<String>(),
-            Some(&"device-2".to_string())
-        );
+
+        let v0: String = serde_json::from_slice(&results[0].1).unwrap();
+        let v1: String = serde_json::from_slice(&results[1].1).unwrap();
+        assert_eq!(v0, "device-1");
+        assert_eq!(v1, "device-2");
     }
 
     #[test]
     fn scan_does_not_include_exact_prefix() {
         let store = StateStore::new();
-        store.set("home/devices", "parent".to_string());
-        store.set("home/devices/1", "child-1".to_string());
-        store.set("home/devices/2", "child-2".to_string());
+        store.set("home/devices", "parent");
+        store.set("home/devices/1", "child-1");
+        store.set("home/devices/2", "child-2");
 
         let results = store.scan("home/devices");
         assert_eq!(results.len(), 2);
-        // "home/devices" itself should NOT be in results.
         assert!(results.iter().all(|(k, _)| k != "home/devices"));
     }
 
@@ -427,6 +429,9 @@ mod tests {
         assert_eq!(snap.len(), 3);
         let paths: Vec<&str> = snap.iter().map(|(k, _)| k.as_str()).collect();
         assert_eq!(paths, vec!["a", "b", "c"]);
+
+        let v: u32 = serde_json::from_slice(&snap[0].1).unwrap();
+        assert_eq!(v, 1);
     }
 
     #[test]
@@ -456,7 +461,7 @@ mod tests {
         let called = Arc::new(AtomicU64::new(0));
         let called_c = called.clone();
 
-        store.subscribe("auth/state", move |path, _value| {
+        store.subscribe("auth/state", move |path, _bytes| {
             assert_eq!(path, "auth/state");
             called_c.fetch_add(1, Ordering::Relaxed);
         });
@@ -471,7 +476,7 @@ mod tests {
         let called = Arc::new(AtomicU64::new(0));
         let called_c = called.clone();
 
-        store.subscribe("auth/state", move |_path, _value| {
+        store.subscribe("auth/state", move |_path, _bytes| {
             called_c.fetch_add(1, Ordering::Relaxed);
         });
 
@@ -486,8 +491,8 @@ mod tests {
         let received = Arc::new(RwLock::new(None::<u32>));
         let received_c = received.clone();
 
-        store.subscribe("counter", move |_path, value| {
-            let v = *value.downcast_ref::<u32>().unwrap();
+        store.subscribe("counter", move |_path, bytes| {
+            let v: u32 = serde_json::from_slice(bytes).unwrap();
             *received_c.write().unwrap() = Some(v);
         });
 
@@ -501,7 +506,7 @@ mod tests {
         let count = Arc::new(AtomicU64::new(0));
         let count_c = count.clone();
 
-        store.subscribe("counter", move |_path, _value| {
+        store.subscribe("counter", move |_path, _bytes| {
             count_c.fetch_add(1, Ordering::Relaxed);
         });
 
@@ -521,7 +526,7 @@ mod tests {
         let paths_seen = Arc::new(RwLock::new(Vec::<String>::new()));
         let paths_c = paths_seen.clone();
 
-        store.subscribe("auth/+", move |path, _value| {
+        store.subscribe("auth/+", move |path, _bytes| {
             paths_c.write().unwrap().push(path.to_string());
         });
 
@@ -541,7 +546,7 @@ mod tests {
         let count = Arc::new(AtomicU64::new(0));
         let count_c = count.clone();
 
-        store.subscribe("auth/#", move |_path, _value| {
+        store.subscribe("auth/#", move |_path, _bytes| {
             count_c.fetch_add(1, Ordering::Relaxed);
         });
 
@@ -559,7 +564,7 @@ mod tests {
         let count = Arc::new(AtomicU64::new(0));
         let count_c = count.clone();
 
-        store.subscribe("#", move |_path, _value| {
+        store.subscribe("#", move |_path, _bytes| {
             count_c.fetch_add(1, Ordering::Relaxed);
         });
 
@@ -582,10 +587,10 @@ mod tests {
         let ca = count_a.clone();
         let cb = count_b.clone();
 
-        store.subscribe("auth/state", move |_, _| {
+        store.subscribe("auth/state", move |_, _bytes| {
             ca.fetch_add(1, Ordering::Relaxed);
         });
-        store.subscribe("auth/state", move |_, _| {
+        store.subscribe("auth/state", move |_, _bytes| {
             cb.fetch_add(1, Ordering::Relaxed);
         });
 
@@ -605,13 +610,13 @@ mod tests {
         let w = wild.clone();
         let a = all.clone();
 
-        store.subscribe("auth/state", move |_, _| {
+        store.subscribe("auth/state", move |_, _bytes| {
             e.fetch_add(1, Ordering::Relaxed);
         });
-        store.subscribe("auth/+", move |_, _| {
+        store.subscribe("auth/+", move |_, _bytes| {
             w.fetch_add(1, Ordering::Relaxed);
         });
-        store.subscribe("#", move |_, _| {
+        store.subscribe("#", move |_, _bytes| {
             a.fetch_add(1, Ordering::Relaxed);
         });
 
@@ -632,7 +637,7 @@ mod tests {
         let count = Arc::new(AtomicU64::new(0));
         let count_c = count.clone();
 
-        let id = store.subscribe("auth/state", move |_, _| {
+        let id = store.subscribe("auth/state", move |_, _bytes| {
             count_c.fetch_add(1, Ordering::Relaxed);
         });
 
@@ -641,7 +646,7 @@ mod tests {
 
         store.unsubscribe("auth/state", id);
         store.set("auth/state", 2u32);
-        assert_eq!(count.load(Ordering::Relaxed), 1); // not incremented
+        assert_eq!(count.load(Ordering::Relaxed), 1);
     }
 
     #[test]
@@ -652,18 +657,18 @@ mod tests {
         let ca = count_a.clone();
         let cb = count_b.clone();
 
-        let id_a = store.subscribe("auth/state", move |_, _| {
+        let id_a = store.subscribe("auth/state", move |_, _bytes| {
             ca.fetch_add(1, Ordering::Relaxed);
         });
-        let _id_b = store.subscribe("auth/state", move |_, _| {
+        let _id_b = store.subscribe("auth/state", move |_, _bytes| {
             cb.fetch_add(1, Ordering::Relaxed);
         });
 
         store.unsubscribe("auth/state", id_a);
         store.set("auth/state", 1u32);
 
-        assert_eq!(count_a.load(Ordering::Relaxed), 0); // unsubscribed
-        assert_eq!(count_b.load(Ordering::Relaxed), 1); // still active
+        assert_eq!(count_a.load(Ordering::Relaxed), 0);
+        assert_eq!(count_b.load(Ordering::Relaxed), 1);
     }
 
     #[test]
@@ -672,7 +677,7 @@ mod tests {
         let count = Arc::new(AtomicU64::new(0));
         let count_c = count.clone();
 
-        let id = store.subscribe("auth/#", move |_, _| {
+        let id = store.subscribe("auth/#", move |_, _bytes| {
             count_c.fetch_add(1, Ordering::Relaxed);
         });
 
@@ -687,7 +692,6 @@ mod tests {
     #[test]
     fn unsubscribe_nonexistent_is_noop() {
         let store = StateStore::new();
-        // Should not panic.
         store.unsubscribe("auth/state", SubscriptionId(999));
     }
 
@@ -717,31 +721,31 @@ mod tests {
         let store = Arc::new(StateStore::new());
         let store_c = store.clone();
 
-        store.subscribe("counter", move |path, _value| {
-            // Inside the notification, the store should already have the new value.
-            let current = store_c.get(path).unwrap();
-            assert!(current.downcast_ref::<u32>().is_some());
+        store.subscribe("counter", move |path, _bytes| {
+            let stored = store_c.get(path).unwrap();
+            let v: u32 = serde_json::from_slice(&stored).unwrap();
+            assert_eq!(v, 42);
         });
 
         store.set("counter", 42u32);
     }
 
     // ========================================================================
-    // set_value also notifies
+    // set_bytes also notifies
     // ========================================================================
 
     #[test]
-    fn set_value_triggers_subscription() {
+    fn set_bytes_triggers_subscription() {
         let store = StateStore::new();
         let called = Arc::new(AtomicU64::new(0));
         let called_c = called.clone();
 
-        store.subscribe("test", move |_, _| {
+        store.subscribe("test", move |_, _bytes| {
             called_c.fetch_add(1, Ordering::Relaxed);
         });
 
-        let sv = StateValue::new(42u32);
-        store.set_value("test", sv);
+        let bytes = serde_json::to_vec(&42u32).unwrap();
+        store.set_bytes("test", bytes);
         assert_eq!(called.load(Ordering::Relaxed), 1);
     }
 
@@ -756,7 +760,6 @@ mod tests {
         let store = Arc::new(StateStore::new());
         let mut handles = vec![];
 
-        // Writer thread.
         let store_w = store.clone();
         handles.push(thread::spawn(move || {
             for i in 0u32..1000 {
@@ -764,7 +767,6 @@ mod tests {
             }
         }));
 
-        // Reader thread.
         let store_r = store.clone();
         handles.push(thread::spawn(move || {
             for _ in 0..1000 {
@@ -787,9 +789,8 @@ mod tests {
         let store = Arc::new(StateStore::new());
         let total = Arc::new(AtomicU64::new(0));
 
-        // Subscribe before spawning threads.
         let total_c = total.clone();
-        store.subscribe("#", move |_, _| {
+        store.subscribe("#", move |_, _bytes| {
             total_c.fetch_add(1, Ordering::Relaxed);
         });
 

@@ -1,9 +1,11 @@
 //! Search requests.
 
 use flux_derive::request;
+use serde::{Deserialize, Serialize};
 
 /// Search users and tweets by keyword.
 #[request("search/query")]
+#[derive(Serialize, Deserialize)]
 pub struct SearchReq {
     pub query: String,
 }
@@ -14,4 +16,5 @@ impl SearchReq {
 
 /// Clear search results.
 #[request("search/clear")]
+#[derive(Serialize, Deserialize)]
 pub struct SearchClearReq;

@@ -20,6 +20,7 @@ base64.workspace = true
 chrono.workspace = true
 flatbuffers.workspace = true
 flux-derive = { path = "../../crates/bff/derive" }
+flux-ffi = { path = "../../crates/bff/ffi" }
 jsonwebtoken.workspace = true
 openerp-blob = { path = "../../crates/support/blob" }
 openerp-client = { path = "../../crates/dsl/client" }
