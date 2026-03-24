@@ -29,7 +29,7 @@ pub trait SearchStore: Serialize + DeserializeOwned + Clone + Send + Sync + 'sta
             // Try snake_case and camelCase.
             let val = json
                 .get(field.name)
-                .or_else(|| json.get(&to_camel_case(field.name)))
+                .or_else(|| json.get(to_camel_case(field.name)))
                 .and_then(|v| match v {
                     serde_json::Value::String(s) => Some(s.clone()),
                     serde_json::Value::Null => None,

@@ -33,7 +33,7 @@ mod state;
 pub fn state(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item = parse_macro_input!(item as syn::ItemStruct);
     state::expand(attr.into(), item)
-        .unwrap_or_else(|e| e.to_compile_error().into())
+        .unwrap_or_else(|e| e.to_compile_error())
         .into()
 }
 
@@ -59,7 +59,7 @@ pub fn state(attr: TokenStream, item: TokenStream) -> TokenStream {
 pub fn flux_handlers(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let item = parse_macro_input!(item as syn::ItemImpl);
     handlers::expand(item)
-        .unwrap_or_else(|e| e.to_compile_error().into())
+        .unwrap_or_else(|e| e.to_compile_error())
         .into()
 }
 
@@ -79,6 +79,6 @@ pub fn flux_handlers(_attr: TokenStream, item: TokenStream) -> TokenStream {
 pub fn request(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item = parse_macro_input!(item as syn::ItemStruct);
     request::expand(attr.into(), item)
-        .unwrap_or_else(|e| e.to_compile_error().into())
+        .unwrap_or_else(|e| e.to_compile_error())
         .into()
 }

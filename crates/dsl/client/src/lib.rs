@@ -438,7 +438,7 @@ impl<T: DslModel> ResourceClient<T> {
 
     /// Get a record by ID.
     pub async fn get(&self, id: &str) -> Result<T, ApiError> {
-        let req = self.http.get(&self.item_url(id));
+        let req = self.http.get(self.item_url(id));
         let req = self.authed(req).await?;
         let resp = req.send().await?;
         Self::parse(resp).await
@@ -446,7 +446,7 @@ impl<T: DslModel> ResourceClient<T> {
 
     /// Create a new record.
     pub async fn create(&self, item: &T) -> Result<T, ApiError> {
-        let req = self.http.post(&self.collection_url()).json(item);
+        let req = self.http.post(self.collection_url()).json(item);
         let req = self.authed(req).await?;
         let resp = req.send().await?;
         Self::parse(resp).await
@@ -454,7 +454,7 @@ impl<T: DslModel> ResourceClient<T> {
 
     /// Update an existing record by ID.
     pub async fn update(&self, id: &str, item: &T) -> Result<T, ApiError> {
-        let req = self.http.put(&self.item_url(id)).json(item);
+        let req = self.http.put(self.item_url(id)).json(item);
         let req = self.authed(req).await?;
         let resp = req.send().await?;
         Self::parse(resp).await
@@ -470,7 +470,7 @@ impl<T: DslModel> ResourceClient<T> {
     /// let updated = client.patch("abc123", &patch).await?;
     /// ```
     pub async fn patch(&self, id: &str, patch: &serde_json::Value) -> Result<T, ApiError> {
-        let req = self.http.patch(&self.item_url(id)).json(patch);
+        let req = self.http.patch(self.item_url(id)).json(patch);
         let req = self.authed(req).await?;
         let resp = req.send().await?;
         Self::parse(resp).await
@@ -478,7 +478,7 @@ impl<T: DslModel> ResourceClient<T> {
 
     /// Delete a record by ID.
     pub async fn delete(&self, id: &str) -> Result<(), ApiError> {
-        let req = self.http.delete(&self.item_url(id));
+        let req = self.http.delete(self.item_url(id));
         let req = self.authed(req).await?;
         let resp = req.send().await?;
         let status = resp.status();

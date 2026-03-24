@@ -6,11 +6,13 @@
 //! 3. Admin dashboard accessible at http://<lan-ip>:<port>/dashboard
 //! 4. iOS/Android/Desktop all share the same backend data
 
+#![allow(clippy::not_unsafe_ptr_arg_deref)]
+
 use std::any::Any;
-use std::ffi::{CStr, CString, c_char, c_void};
+use std::ffi::{CStr, CString, c_char};
 use std::sync::Arc;
 
-use openerp_flux::{Flux, StateStore, StateValue, SubscriptionId};
+use openerp_flux::{Flux, StateValue};
 
 use flux_golden::handlers::TwitterBff;
 use flux_golden::request::*;
@@ -336,9 +338,9 @@ fn seed_demo_data(kv: &Arc<dyn openerp_kv::KVStore>) {
             .save_new(User {
                 id: Id::default(),
                 username: username.into(),
-                password_hash: Some(PasswordHash::new(&ffi_hash_pw("password"))),
+                password_hash: Some(PasswordHash::new(ffi_hash_pw("password"))),
                 bio: Some(bio.into()),
-                avatar: Some(Avatar::new(&format!(
+                avatar: Some(Avatar::new(format!(
                     "https://api.dicebear.com/7.x/initials/svg?seed={}",
                     username
                 ))),
@@ -365,7 +367,7 @@ fn seed_demo_data(kv: &Arc<dyn openerp_kv::KVStore>) {
         tweets_ops
             .save_new(Tweet {
                 id: Id::default(),
-                author: Name::new(&format!("twitter/users/{}", author)),
+                author: Name::new(format!("twitter/users/{}", author)),
                 content: content.into(),
                 image_url: None,
                 like_count: 0,

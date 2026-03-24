@@ -9,9 +9,10 @@ use flatbuffers::FlatBufferBuilder;
 // ── Format enum ─────────────────────────────────────────────────────
 
 /// Wire format for facet API responses.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Format {
     /// JSON — `application/json`. Default, human-readable.
+    #[default]
     Json,
     /// FlatBuffers — `application/x-flatbuffers`. Zero-copy binary.
     FlatBuffers,
@@ -45,12 +46,6 @@ impl Format {
         } else {
             Format::Json
         }
-    }
-}
-
-impl Default for Format {
-    fn default() -> Self {
-        Format::Json
     }
 }
 

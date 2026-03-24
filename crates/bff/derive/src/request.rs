@@ -86,14 +86,14 @@ fn parse_path(attr: TokenStream) -> syn::Result<String> {
 fn collect_derives(item: &ItemStruct) -> Vec<String> {
     let mut derives = Vec::new();
     for attr in &item.attrs {
-        if attr.path().is_ident("derive") {
-            if let Ok(meta) = attr.parse_args_with(
+        if attr.path().is_ident("derive")
+            && let Ok(meta) = attr.parse_args_with(
                 syn::punctuated::Punctuated::<syn::Path, syn::Token![,]>::parse_terminated,
-            ) {
-                for path in meta {
-                    if let Some(ident) = path.get_ident() {
-                        derives.push(ident.to_string());
-                    }
+            )
+        {
+            for path in meta {
+                if let Some(ident) = path.get_ident() {
+                    derives.push(ident.to_string());
                 }
             }
         }

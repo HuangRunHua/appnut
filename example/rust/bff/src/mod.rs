@@ -11,7 +11,6 @@ use std::sync::Arc;
 use flux_derive::flux_handlers;
 use openerp_flux::StateStore;
 
-use self::global::helpers;
 use crate::request::*;
 use crate::server::rest_app::app::{self, AppClient, AppTweet};
 use crate::state::*;
@@ -19,6 +18,12 @@ use crate::state::*;
 /// Mutable token source — stores the JWT from login, used for subsequent calls.
 pub struct MutableToken {
     token: tokio::sync::RwLock<Option<String>>,
+}
+
+impl Default for MutableToken {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MutableToken {
@@ -210,7 +215,7 @@ impl TwitterBff {
                     );
                 }
             }
-            Err(e) => {
+            Err(_e) => {
                 store.set(
                     AuthState::PATH,
                     AuthState {
@@ -477,9 +482,8 @@ impl TwitterBff {
             .get(ComposeState::PATH)
             .and_then(|v| v.downcast_ref::<ComposeState>().cloned())
             .unwrap_or_else(ComposeState::empty);
-        match req.field.as_str() {
-            "content" => state.content = req.value.clone(),
-            _ => {}
+        if req.field.as_str() == "content" {
+            state.content = req.value.clone()
         }
         state.error = None;
         store.set(ComposeState::PATH, state);

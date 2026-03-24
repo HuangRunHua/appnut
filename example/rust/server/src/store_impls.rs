@@ -30,7 +30,7 @@ impl KvStore for User {
     }
 
     fn before_update(&mut self) {
-        self.updated_at = DateTime::new(&chrono::Utc::now().to_rfc3339());
+        self.updated_at = DateTime::new(chrono::Utc::now().to_rfc3339());
     }
 }
 
@@ -47,7 +47,7 @@ impl KvStore for Tweet {
 
     fn before_create(&mut self) {
         if self.id.is_empty() {
-            self.id = Id::new(&uuid::Uuid::new_v4().to_string().replace('-', ""));
+            self.id = Id::new(uuid::Uuid::new_v4().to_string().replace('-', ""));
         }
         let now = chrono::Utc::now().to_rfc3339();
         if self.created_at.is_empty() {
@@ -57,7 +57,7 @@ impl KvStore for Tweet {
     }
 
     fn before_update(&mut self) {
-        self.updated_at = DateTime::new(&chrono::Utc::now().to_rfc3339());
+        self.updated_at = DateTime::new(chrono::Utc::now().to_rfc3339());
     }
 }
 
@@ -74,7 +74,7 @@ impl KvStore for Like {
 
     fn before_create(&mut self) {
         if self.id.is_empty() {
-            self.id = Id::new(&format!(
+            self.id = Id::new(format!(
                 "{}:{}",
                 self.user.resource_id(),
                 self.tweet.resource_id()
@@ -101,7 +101,7 @@ impl KvStore for Message {
 
     fn before_create(&mut self) {
         if self.id.is_empty() {
-            self.id = Id::new(&uuid::Uuid::new_v4().to_string().replace('-', ""));
+            self.id = Id::new(uuid::Uuid::new_v4().to_string().replace('-', ""));
         }
         let now = chrono::Utc::now().to_rfc3339();
         if self.created_at.is_empty() {
@@ -111,7 +111,7 @@ impl KvStore for Message {
     }
 
     fn before_update(&mut self) {
-        self.updated_at = DateTime::new(&chrono::Utc::now().to_rfc3339());
+        self.updated_at = DateTime::new(chrono::Utc::now().to_rfc3339());
     }
 }
 
@@ -128,7 +128,7 @@ impl KvStore for Follow {
 
     fn before_create(&mut self) {
         if self.id.is_empty() {
-            self.id = Id::new(&format!(
+            self.id = Id::new(format!(
                 "{}:{}",
                 self.follower.resource_id(),
                 self.followee.resource_id()

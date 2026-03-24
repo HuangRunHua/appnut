@@ -221,13 +221,12 @@ fn parse_facet_attrs(attr: TokenStream) -> syn::Result<FacetAttrs> {
                 {
                     name = Some(s.value());
                 }
-            } else if nv.path.is_ident("module") {
-                if let syn::Expr::Lit(syn::ExprLit {
+            } else if nv.path.is_ident("module")
+                && let syn::Expr::Lit(syn::ExprLit {
                     lit: Lit::Str(s), ..
                 }) = &nv.value
-                {
-                    module = Some(s.value());
-                }
+            {
+                module = Some(s.value());
             }
         }
     }

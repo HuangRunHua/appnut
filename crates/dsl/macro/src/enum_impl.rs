@@ -156,15 +156,13 @@ fn parse_module_attr(attr: TokenStream) -> syn::Result<String> {
 
     let args: AttrArgs = syn::parse2(attr)?;
     for meta in &args.0 {
-        if let syn::Meta::NameValue(nv) = meta {
-            if nv.path.is_ident("module") {
-                if let syn::Expr::Lit(syn::ExprLit {
-                    lit: Lit::Str(s), ..
-                }) = &nv.value
-                {
-                    return Ok(s.value());
-                }
-            }
+        if let syn::Meta::NameValue(nv) = meta
+            && nv.path.is_ident("module")
+            && let syn::Expr::Lit(syn::ExprLit {
+                lit: Lit::Str(s), ..
+            }) = &nv.value
+        {
+            return Ok(s.value());
         }
     }
 

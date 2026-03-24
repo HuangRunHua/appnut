@@ -144,19 +144,19 @@ pub async fn login(
             )
         })?;
 
-    if let Some(ref stored_hash) = user.password_hash {
-        if !verify_password(&req.password, stored_hash.as_str()) {
-            return Err(ServiceError::Unauthorized(
-                state.i18n.t("error.auth.invalid_token", &[]),
-            ));
-        }
+    if let Some(ref stored_hash) = user.password_hash
+        && !verify_password(&req.password, stored_hash.as_str())
+    {
+        return Err(ServiceError::Unauthorized(
+            state.i18n.t("error.auth.invalid_token", &[]),
+        ));
     }
 
     let display = user.display_name.as_deref().unwrap_or(&user.username);
     let token = state
         .jwt
         .issue(user.id.as_str(), display)
-        .map_err(|e| ServiceError::Internal(e))?;
+        .map_err(ServiceError::Internal)?;
 
     Ok(Json(LoginResponse {
         access_token: token,
@@ -226,14 +226,14 @@ pub async fn create_tweet(
     }
     let tweet = Tweet {
         id: Id::default(),
-        author: Name::new(&format!("twitter/users/{}", uid)),
+        author: Name::new(format!("twitter/users/{}", uid)),
         content: req.content,
         image_url: None,
         like_count: 0,
         reply_count: 0,
         reply_to: req
             .reply_to_id
-            .map(|s| Name::new(&format!("twitter/tweets/{}", s))),
+            .map(|s| Name::new(format!("twitter/tweets/{}", s))),
         display_name: None,
         description: None,
         metadata: None,
@@ -248,11 +248,11 @@ pub async fn create_tweet(
         user.tweet_count += 1;
         let _ = state.users.save(user);
     }
-    if let Some(ref parent_name) = created.reply_to {
-        if let Ok(Some(mut parent)) = state.tweets.get(parent_name.resource_id()) {
-            parent.reply_count += 1;
-            let _ = state.tweets.save(parent);
-        }
+    if let Some(ref parent_name) = created.reply_to
+        && let Ok(Some(mut parent)) = state.tweets.get(parent_name.resource_id())
+    {
+        parent.reply_count += 1;
+        let _ = state.tweets.save(parent);
     }
     Ok(FacetResponse::negotiate(
         to_app_tweet(&created, &uid, &state),
@@ -297,8 +297,8 @@ pub async fn like_tweet(
     let uid = current_user(&headers, &state)?;
     let like = Like {
         id: Id::default(),
-        user: Name::new(&format!("twitter/users/{}", uid)),
-        tweet: Name::new(&format!("twitter/tweets/{}", id)),
+        user: Name::new(format!("twitter/users/{}", uid)),
+        tweet: Name::new(format!("twitter/tweets/{}", id)),
         display_name: None,
         description: None,
         metadata: None,
@@ -354,8 +354,8 @@ pub async fn follow_user(
     let uid = current_user(&headers, &state)?;
     let follow = Follow {
         id: Id::default(),
-        follower: Name::new(&format!("twitter/users/{}", uid)),
-        followee: Name::new(&format!("twitter/users/{}", id)),
+        follower: Name::new(format!("twitter/users/{}", uid)),
+        followee: Name::new(format!("twitter/users/{}", id)),
         display_name: None,
         description: None,
         metadata: None,
@@ -454,13 +454,13 @@ pub async fn update_profile(
         })?;
 
     // Optimistic locking: if client sends updatedAt, compare with stored value.
-    if let Some(ref client_ts) = req.updated_at {
-        if client_ts != user.updated_at.as_str() {
-            return Err(ServiceError::Conflict(format!(
-                "updatedAt mismatch: stored {}, got {}",
-                user.updated_at, client_ts
-            )));
-        }
+    if let Some(ref client_ts) = req.updated_at
+        && client_ts != user.updated_at.as_str()
+    {
+        return Err(ServiceError::Conflict(format!(
+            "updatedAt mismatch: stored {}, got {}",
+            user.updated_at, client_ts
+        )));
     }
 
     user.display_name = Some(req.display_name);
@@ -494,10 +494,10 @@ pub async fn change_password(
         .map_err(|e| ServiceError::Internal(e.to_string()))?
         .ok_or_else(|| ServiceError::NotFound("user not found".into()))?;
 
-    if let Some(ref stored) = user.password_hash {
-        if !verify_password(&req.old_password, stored.as_str()) {
-            return Err(ServiceError::Unauthorized("incorrect old password".into()));
-        }
+    if let Some(ref stored) = user.password_hash
+        && !verify_password(&req.old_password, stored.as_str())
+    {
+        return Err(ServiceError::Unauthorized("incorrect old password".into()));
     }
     if req.new_password.len() < 6 {
         return Err(ServiceError::Validation(
@@ -510,7 +510,7 @@ pub async fn change_password(
         ));
     }
 
-    user.password_hash = Some(PasswordHash::new(&hash_password(&req.new_password)));
+    user.password_hash = Some(PasswordHash::new(hash_password(&req.new_password)));
     state
         .users
         .save(user)
@@ -725,7 +725,7 @@ mod tests {
             .save_new(User {
                 id: Id::default(),
                 username: "alice".into(),
-                password_hash: Some(PasswordHash::new(&hash_password("password"))),
+                password_hash: Some(PasswordHash::new(hash_password("password"))),
                 bio: Some("Rust dev".into()),
                 avatar: None,
                 follower_count: 0,
@@ -742,7 +742,7 @@ mod tests {
             .save_new(User {
                 id: Id::default(),
                 username: "bob".into(),
-                password_hash: Some(PasswordHash::new(&hash_password("password"))),
+                password_hash: Some(PasswordHash::new(hash_password("password"))),
                 bio: None,
                 avatar: None,
                 follower_count: 0,
@@ -1575,7 +1575,7 @@ mod tests {
             .save_new(User {
                 id: Id::default(),
                 username: "alice".into(),
-                password_hash: Some(PasswordHash::new(&hash_password("password"))),
+                password_hash: Some(PasswordHash::new(hash_password("password"))),
                 bio: None,
                 avatar: None,
                 follower_count: 0,
@@ -1717,12 +1717,12 @@ mod tests {
         let msgs = body["messages"].as_array().unwrap();
         let broadcast = msgs.iter().find(|m| m["kind"] == "broadcast").unwrap();
         let msg_id = broadcast["id"].as_str().unwrap().to_string();
-        assert_eq!(broadcast["read"].as_bool().unwrap(), false);
+        assert!(!broadcast["read"].as_bool().unwrap());
 
         let uri = format!("/messages/{}/read", msg_id);
         let (s, msg) = call_with_lang(&r, "POST", &uri, Some(&token), "en", None).await;
         assert_eq!(s, StatusCode::OK);
-        assert_eq!(msg["read"].as_bool().unwrap(), true);
+        assert!(msg["read"].as_bool().unwrap());
 
         let (_, body2) = call_with_lang(&r, "POST", "/inbox", Some(&token), "en", None).await;
         assert_eq!(body2["unreadCount"].as_u64().unwrap(), 1);

@@ -127,10 +127,7 @@ impl<T: Clone> TrieNode<T> {
                 child.values.push(value);
             }
             segment => {
-                let child = self
-                    .children
-                    .entry(segment.to_string())
-                    .or_insert_with(TrieNode::default);
+                let child = self.children.entry(segment.to_string()).or_default();
                 child.insert(rest, value);
             }
         }
@@ -211,15 +208,15 @@ impl<T: Clone> TrieNode<T> {
             "+" => self
                 .single
                 .as_ref()
-                .map_or(false, |child| child.has_pattern(rest)),
+                .is_some_and(|child| child.has_pattern(rest)),
             "#" => self
                 .multi
                 .as_ref()
-                .map_or(false, |child| !child.values.is_empty()),
+                .is_some_and(|child| !child.values.is_empty()),
             segment => self
                 .children
                 .get(segment)
-                .map_or(false, |child| child.has_pattern(rest)),
+                .is_some_and(|child| child.has_pattern(rest)),
         }
     }
 }

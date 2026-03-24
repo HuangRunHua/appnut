@@ -151,9 +151,9 @@ fn seed_data(kv: &Arc<dyn openerp_kv::KVStore>) {
             .save_new(User {
                 id: Id::default(),
                 username: username.to_string(),
-                password_hash: Some(PasswordHash::new(&hash_pw("password"))),
+                password_hash: Some(PasswordHash::new(hash_pw("password"))),
                 bio: Some(bio.to_string()),
-                avatar: Some(Avatar::new(&format!(
+                avatar: Some(Avatar::new(format!(
                     "https://api.dicebear.com/7.x/initials/svg?seed={}",
                     username
                 ))),
@@ -223,12 +223,12 @@ fn seed_data(kv: &Arc<dyn openerp_kv::KVStore>) {
     for &(author, content, reply_to) in &tweets_data {
         let tweet = Tweet {
             id: Id::default(),
-            author: Name::new(&format!("twitter/users/{}", author)),
+            author: Name::new(format!("twitter/users/{}", author)),
             content: content.to_string(),
             image_url: None,
             like_count: 0,
             reply_count: 0,
-            reply_to: reply_to.map(|s| Name::new(&format!("twitter/tweets/{}", s))),
+            reply_to: reply_to.map(|s| Name::new(format!("twitter/tweets/{}", s))),
             display_name: None,
             description: None,
             metadata: None,
@@ -263,12 +263,12 @@ fn seed_data(kv: &Arc<dyn openerp_kv::KVStore>) {
         tweets_ops
             .save_new(Tweet {
                 id: Id::default(),
-                author: Name::new(&format!("twitter/users/{}", author)),
+                author: Name::new(format!("twitter/users/{}", author)),
                 content: content.to_string(),
                 image_url: None,
                 like_count: 0,
                 reply_count: 0,
-                reply_to: Some(Name::new(&format!("twitter/tweets/{}", parent_id))),
+                reply_to: Some(Name::new(format!("twitter/tweets/{}", parent_id))),
                 display_name: None,
                 description: None,
                 metadata: None,
@@ -313,8 +313,8 @@ fn seed_data(kv: &Arc<dyn openerp_kv::KVStore>) {
         let tweet_id = &tweet_ids[tweet_idx];
         let _ = likes_ops.save_new(Like {
             id: Id::default(),
-            user: Name::new(&format!("twitter/users/{}", liker)),
-            tweet: Name::new(&format!("twitter/tweets/{}", tweet_id)),
+            user: Name::new(format!("twitter/users/{}", liker)),
+            tweet: Name::new(format!("twitter/tweets/{}", tweet_id)),
             display_name: None,
             description: None,
             metadata: None,
@@ -344,8 +344,8 @@ fn seed_data(kv: &Arc<dyn openerp_kv::KVStore>) {
     for &(follower, followee) in &follow_pairs {
         let _ = follows_ops.save_new(Follow {
             id: Id::default(),
-            follower: Name::new(&format!("twitter/users/{}", follower)),
-            followee: Name::new(&format!("twitter/users/{}", followee)),
+            follower: Name::new(format!("twitter/users/{}", follower)),
+            followee: Name::new(format!("twitter/users/{}", followee)),
             display_name: None,
             description: None,
             metadata: None,

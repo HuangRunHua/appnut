@@ -246,10 +246,10 @@ impl<T: SqlStore + DslModel> SqlOps<T> {
     pub fn count(&self) -> Result<usize, ServiceError> {
         let sql = format!("SELECT COUNT(*) AS cnt FROM \"{}\"", T::table_name());
         let rows = self.sql.query(&sql, &[]).map_err(Self::sql_err)?;
-        if let Some(row) = rows.first() {
-            if let Some(openerp_sql::Value::Integer(n)) = row.get("cnt") {
-                return Ok(*n as usize);
-            }
+        if let Some(row) = rows.first()
+            && let Some(openerp_sql::Value::Integer(n)) = row.get("cnt")
+        {
+            return Ok(*n as usize);
         }
         Ok(0)
     }
@@ -298,7 +298,7 @@ impl<T: SqlStore + DslModel> SqlOps<T> {
             placeholders.push(format!("?{}", i + 1));
             let val = json_val
                 .get(f.name)
-                .or_else(|| json_val.get(&to_camel_case(f.name)))
+                .or_else(|| json_val.get(to_camel_case(f.name)))
                 .map(|v| match v {
                     serde_json::Value::String(s) => openerp_sql::Value::Text(s.clone()),
                     serde_json::Value::Number(n) => {
@@ -430,7 +430,7 @@ impl<T: SqlStore + DslModel> SqlOps<T> {
             set_clauses.push(format!("\"{}\" = ?{}", f.name, idx));
             let val = json_val
                 .get(f.name)
-                .or_else(|| json_val.get(&to_camel_case(f.name)))
+                .or_else(|| json_val.get(to_camel_case(f.name)))
                 .map(|v| match v {
                     serde_json::Value::String(s) => openerp_sql::Value::Text(s.clone()),
                     serde_json::Value::Number(n) => {
@@ -1013,7 +1013,7 @@ mod tests {
         let (ops, _dir) = make_ops();
         seed_devices(&ops);
 
-        let build_field = Field::new("model", "u32", "number");
+        let _build_field = Field::new("model", "u32", "number");
         let desc_field = Field::new("description", "Option<String>", "text");
         // model is indexed so it goes through SQL. But test the value matching
         // logic by using description (non-indexed string) + verifying numeric

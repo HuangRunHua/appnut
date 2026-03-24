@@ -628,10 +628,10 @@ impl LocalizedText {
             return s;
         }
         // Fallback: try base language (e.g. "zh-CN" → "zh").
-        if let Some(dash) = locale.find('-') {
-            if let Some(s) = self.0.get(&locale[..dash]) {
-                return s;
-            }
+        if let Some(dash) = locale.find('-')
+            && let Some(s) = self.0.get(&locale[..dash])
+        {
+            return s;
         }
         // Fallback to English.
         if let Some(s) = self.0.get("en") {
@@ -710,15 +710,12 @@ pub const fn const_str_eq(a: &str, b: &str) -> bool {
 ///   policy → policies, batch → batches, device → devices,
 ///   relay → relays, user → users, bus → buses
 pub fn pluralize(s: &str) -> String {
-    if s.ends_with('y') {
-        // Consonant + y → ies (policy → policies)
-        // Vowel + y → ys (relay → relays, day → days)
-        let chars: Vec<char> = s.chars().collect();
-        if chars.len() >= 2 {
-            let before_y = chars[chars.len() - 2];
-            if !"aeiou".contains(before_y) {
-                return format!("{}ies", &s[..s.len() - 1]);
-            }
+    if let Some(stripped) = s.strip_suffix('y') {
+        let chars: Vec<char> = stripped.chars().collect();
+        if let Some(&before_y) = chars.last()
+            && !"aeiou".contains(before_y)
+        {
+            return format!("{stripped}ies");
         }
         format!("{}s", s)
     } else if s.ends_with('s')

@@ -29,7 +29,7 @@ pub fn tweet_to_feed_item(
     let author = users
         .iter()
         .find(|u| u.id.as_str() == author_id)
-        .map(|u| user_to_profile(u))
+        .map(user_to_profile)
         .unwrap_or_else(|| UserProfile {
             id: author_id.to_string(),
             username: "unknown".into(),
@@ -59,7 +59,7 @@ pub fn tweet_to_feed_item(
 /// Build timeline from fetched data.
 pub fn build_timeline(
     current_user_id: &str,
-    tweets: &mut Vec<model::Tweet>,
+    tweets: &mut [model::Tweet],
     users: &[model::User],
     likes: &[model::Like],
 ) -> TimelineFeed {

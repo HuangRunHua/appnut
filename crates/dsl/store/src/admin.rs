@@ -450,7 +450,7 @@ fn get_hidden_fields(ir: &serde_json::Value) -> Vec<String> {
             fields
                 .iter()
                 .filter(|f| f["widget"].as_str() == Some("hidden"))
-                .filter_map(|f| f["name"].as_str().map(|s| to_camel_case(s)))
+                .filter_map(|f| f["name"].as_str().map(to_camel_case))
                 .collect()
         })
         .unwrap_or_default()
@@ -490,10 +490,10 @@ fn merge_hidden_fields<T: Serialize + DeserializeOwned>(
     {
         for field in hidden_fields {
             // If new record has null for hidden field, preserve existing value
-            if new_obj.get(field).map(|v| v.is_null()).unwrap_or(true) {
-                if let Some(existing_value) = existing_obj.get(field) {
-                    new_obj.insert(field.clone(), existing_value.clone());
-                }
+            if new_obj.get(field).map(|v| v.is_null()).unwrap_or(true)
+                && let Some(existing_value) = existing_obj.get(field)
+            {
+                new_obj.insert(field.clone(), existing_value.clone());
             }
         }
     }
