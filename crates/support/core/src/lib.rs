@@ -4,7 +4,7 @@ pub mod error;
 pub mod module;
 pub mod types;
 
-pub use auth::{Authenticator, AllowAll, DenyAll};
+pub use auth::{AllowAll, Authenticator, DenyAll, JwtAuthenticator};
 pub use config::ServiceConfig;
 pub use error::ServiceError;
 pub use module::Module;

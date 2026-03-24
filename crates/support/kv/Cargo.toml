@@ -12,3 +12,6 @@ path = "src/lib.rs"
 redb.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
