@@ -7,14 +7,14 @@
 //! 4. iOS/Android/Desktop all share the same backend data
 
 use std::any::Any;
-use std::ffi::{c_char, c_void, CStr, CString};
+use std::ffi::{CStr, CString, c_char, c_void};
 use std::sync::Arc;
 
 use openerp_flux::{Flux, StateStore, StateValue, SubscriptionId};
 
-use flux_golden::state::*;
-use flux_golden::request::*;
 use flux_golden::handlers::TwitterBff;
+use flux_golden::request::*;
+use flux_golden::state::*;
 
 /// Opaque handle to a Flux instance + embedded server.
 pub struct FluxHandle {
@@ -49,9 +49,7 @@ pub extern "C" fn flux_create() -> *mut FluxHandle {
         .expect("failed to create tokio runtime");
 
     // Start embedded HTTP server.
-    let (server_url, bff) = rt.block_on(async {
-        start_embedded_server().await
-    });
+    let (server_url, bff) = rt.block_on(async { start_embedded_server().await });
 
     let bff = Arc::new(bff);
     let flux = Flux::new();
@@ -76,7 +74,9 @@ pub extern "C" fn flux_create() -> *mut FluxHandle {
 #[unsafe(no_mangle)]
 pub extern "C" fn flux_free(handle: *mut FluxHandle) {
     if !handle.is_null() {
-        unsafe { drop(Box::from_raw(handle)); }
+        unsafe {
+            drop(Box::from_raw(handle));
+        }
     }
 }
 
@@ -100,9 +100,15 @@ pub extern "C" fn flux_get(handle: *const FluxHandle, path: *const c_char) -> Fl
     match handle.flux.get(path) {
         Some(value) => match serialize_state(path, &value) {
             Some(json) => bytes_to_ffi(json),
-            None => FluxBytes { ptr: std::ptr::null(), len: 0 },
+            None => FluxBytes {
+                ptr: std::ptr::null(),
+                len: 0,
+            },
         },
-        None => FluxBytes { ptr: std::ptr::null(), len: 0 },
+        None => FluxBytes {
+            ptr: std::ptr::null(),
+            len: 0,
+        },
     }
 }
 
@@ -137,7 +143,9 @@ pub extern "C" fn flux_i18n_set_locale(handle: *const FluxHandle, locale: *const
     let handle = unsafe { &*handle };
     let locale_str = unsafe { CStr::from_ptr(locale) }.to_str().unwrap_or("en");
     handle.i18n.set_locale(locale_str);
-    let req = Arc::new(SetLocaleReq { locale: locale_str.to_string() });
+    let req = Arc::new(SetLocaleReq {
+        locale: locale_str.to_string(),
+    });
     handle.rt.block_on(async {
         handle.flux.emit_arc(SetLocaleReq::PATH, req).await;
     });
@@ -158,7 +166,9 @@ pub extern "C" fn flux_emit(
     let payload_str = if payload_json.is_null() {
         ""
     } else {
-        unsafe { CStr::from_ptr(payload_json) }.to_str().unwrap_or("")
+        unsafe { CStr::from_ptr(payload_json) }
+            .to_str()
+            .unwrap_or("")
     };
 
     let payload = deserialize_request(path_str, payload_str);
@@ -180,8 +190,7 @@ async fn start_embedded_server() -> (String, TwitterBff) {
     let dir = tempfile::tempdir().expect("failed to create temp dir");
     let dir_path = dir.path().to_path_buf();
     let kv: Arc<dyn openerp_kv::KVStore> = Arc::new(
-        openerp_kv::RedbStore::open(&dir_path.join("flux.redb"))
-            .expect("failed to open redb"),
+        openerp_kv::RedbStore::open(&dir_path.join("flux.redb")).expect("failed to open redb"),
     );
     std::mem::forget(dir);
 
@@ -194,13 +203,13 @@ async fn start_embedded_server() -> (String, TwitterBff) {
     let twitter_admin = flux_golden::server::admin_router(kv.clone(), auth);
 
     // Build schema.
-    let schema_json = openerp_store::build_schema("Twitter", vec![
-        flux_golden::server::schema_def(),
-    ]);
+    let schema_json =
+        openerp_store::build_schema("Twitter", vec![flux_golden::server::schema_def()]);
 
     // Detect LAN IP + bind to a random port (need server_url for blob_base_url).
     let lan_ip = get_lan_ip().unwrap_or_else(|| "127.0.0.1".to_string());
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:0").await
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:0")
+        .await
         .expect("failed to bind");
     let port = listener.local_addr().unwrap().port();
     let server_url = format!("http://{}:{}", lan_ip, port);
@@ -208,9 +217,8 @@ async fn start_embedded_server() -> (String, TwitterBff) {
     // Build facet router (for app).
     let blob_dir = dir_path.join("blobs");
     std::fs::create_dir_all(&blob_dir).ok();
-    let blobs: Arc<dyn openerp_blob::BlobStore> = Arc::new(
-        openerp_blob::FileStore::open(&blob_dir).unwrap(),
-    );
+    let blobs: Arc<dyn openerp_blob::BlobStore> =
+        Arc::new(openerp_blob::FileStore::open(&blob_dir).unwrap());
 
     let facet_state = Arc::new(flux_golden::server::facet_handlers::FacetStateInner {
         users: openerp_store::KvOps::new(kv.clone()),
@@ -235,10 +243,13 @@ async fn start_embedded_server() -> (String, TwitterBff) {
     let login_handler = axum::routing::post(|| async {
         let now = chrono::Utc::now().timestamp();
         let header = base64_url("{}");
-        let payload = base64_url(&serde_json::json!({
-            "sub": "app", "roles": ["admin"],
-            "iat": now, "exp": now + 86400,
-        }).to_string());
+        let payload = base64_url(
+            &serde_json::json!({
+                "sub": "app", "roles": ["admin"],
+                "iat": now, "exp": now + 86400,
+            })
+            .to_string(),
+        );
         let sig = base64_url("sig");
         let token = format!("{}.{}.{}", header, payload, sig);
         axum::Json(serde_json::json!({
@@ -247,19 +258,25 @@ async fn start_embedded_server() -> (String, TwitterBff) {
     });
 
     let app = axum::Router::new()
-        .route("/", axum::routing::get(|| async {
-            axum::response::Html(openerp_web::login_html())
-        }))
-        .route("/dashboard", axum::routing::get(|| async {
-            axum::response::Html(openerp_web::dashboard_html())
-        }))
-        .route("/meta/schema", axum::routing::get(move || {
-            let s = schema.clone();
-            async move { axum::Json(s) }
-        }))
-        .route("/health", axum::routing::get(|| async {
-            axum::Json(serde_json::json!({"status": "ok"}))
-        }))
+        .route(
+            "/",
+            axum::routing::get(|| async { axum::response::Html(openerp_web::login_html()) }),
+        )
+        .route(
+            "/dashboard",
+            axum::routing::get(|| async { axum::response::Html(openerp_web::dashboard_html()) }),
+        )
+        .route(
+            "/meta/schema",
+            axum::routing::get(move || {
+                let s = schema.clone();
+                async move { axum::Json(s) }
+            }),
+        )
+        .route(
+            "/health",
+            axum::routing::get(|| async { axum::Json(serde_json::json!({"status": "ok"})) }),
+        )
         .route("/auth/login", login_handler)
         .nest("/app/twitter", facet_router)
         .nest("/admin/twitter", twitter_admin);
@@ -299,41 +316,68 @@ fn base64_url(input: &str) -> String {
 }
 
 fn seed_demo_data(kv: &Arc<dyn openerp_kv::KVStore>) {
+    use flux_golden::server::model::*;
     use openerp_store::KvOps;
     use openerp_types::*;
-    use flux_golden::server::model::*;
 
     let users_ops = KvOps::<User>::new(kv.clone());
     let tweets_ops = KvOps::<Tweet>::new(kv.clone());
 
     for &(username, display, bio) in &[
-        ("alice", "Alice Wang", "Rust developer & open source enthusiast"),
+        (
+            "alice",
+            "Alice Wang",
+            "Rust developer & open source enthusiast",
+        ),
         ("bob", "Bob Li", "Product designer at Haivivi"),
         ("carol", "Carol Zhang", "Full-stack engineer"),
     ] {
-        users_ops.save_new(User {
-            id: Id::default(), username: username.into(),
-            password_hash: Some(PasswordHash::new(&ffi_hash_pw("password"))),
-            bio: Some(bio.into()),
-            avatar: Some(Avatar::new(&format!("https://api.dicebear.com/7.x/initials/svg?seed={}", username))),
-            follower_count: 0, following_count: 0, tweet_count: 0,
-            display_name: Some(display.into()),
-            description: None, metadata: None, created_at: DateTime::default(), updated_at: DateTime::default(),
-        }).unwrap();
+        users_ops
+            .save_new(User {
+                id: Id::default(),
+                username: username.into(),
+                password_hash: Some(PasswordHash::new(&ffi_hash_pw("password"))),
+                bio: Some(bio.into()),
+                avatar: Some(Avatar::new(&format!(
+                    "https://api.dicebear.com/7.x/initials/svg?seed={}",
+                    username
+                ))),
+                follower_count: 0,
+                following_count: 0,
+                tweet_count: 0,
+                display_name: Some(display.into()),
+                description: None,
+                metadata: None,
+                created_at: DateTime::default(),
+                updated_at: DateTime::default(),
+            })
+            .unwrap();
     }
 
     for &(author, content) in &[
-        ("alice", "Just shipped Flux — a cross-platform state engine in Rust!"),
+        (
+            "alice",
+            "Just shipped Flux — a cross-platform state engine in Rust!",
+        ),
         ("bob", "Dark mode design system is ready. Ship it!"),
         ("carol", "Hot take: Bazel > Cargo for monorepos."),
     ] {
-        tweets_ops.save_new(Tweet {
-            id: Id::default(), author: Name::new(&format!("twitter/users/{}", author)),
-            content: content.into(),
-            image_url: None,
-            like_count: 0, reply_count: 0, reply_to: None,
-            display_name: None, description: None, metadata: None, created_at: DateTime::default(), updated_at: DateTime::default(),
-        }).unwrap();
+        tweets_ops
+            .save_new(Tweet {
+                id: Id::default(),
+                author: Name::new(&format!("twitter/users/{}", author)),
+                content: content.into(),
+                image_url: None,
+                like_count: 0,
+                reply_count: 0,
+                reply_to: None,
+                display_name: None,
+                description: None,
+                metadata: None,
+                created_at: DateTime::default(),
+                updated_at: DateTime::default(),
+            })
+            .unwrap();
         if let Ok(Some(mut u)) = users_ops.get(author) {
             u.tweet_count += 1;
             let _ = users_ops.save(u);
@@ -350,17 +394,35 @@ fn seed_demo_data(kv: &Arc<dyn openerp_kv::KVStore>) {
     t1.set("ja", "TwitterFlux へようこそ！");
     t1.set("es", "¡Bienvenido a TwitterFlux!");
     let mut b1 = LocalizedText::new();
-    b1.set("en", "Thanks for joining! Follow some users and post your first tweet.");
+    b1.set(
+        "en",
+        "Thanks for joining! Follow some users and post your first tweet.",
+    );
     b1.set("zh-CN", "感谢加入！快去关注用户，发你的第一条推文吧！");
-    b1.set("ja", "ご参加ありがとうございます！ユーザーをフォローして最初のツイートを！");
-    b1.set("es", "¡Gracias por unirte! Sigue a usuarios y publica tu primer tweet.");
-    msgs_ops.save_new(Message {
-        id: Id::default(), kind: "broadcast".into(),
-        sender: None, recipient: None,
-        title: t1, body: b1, read: false,
-        display_name: None, description: None, metadata: None,
-        created_at: DateTime::default(), updated_at: DateTime::default(),
-    }).unwrap();
+    b1.set(
+        "ja",
+        "ご参加ありがとうございます！ユーザーをフォローして最初のツイートを！",
+    );
+    b1.set(
+        "es",
+        "¡Gracias por unirte! Sigue a usuarios y publica tu primer tweet.",
+    );
+    msgs_ops
+        .save_new(Message {
+            id: Id::default(),
+            kind: "broadcast".into(),
+            sender: None,
+            recipient: None,
+            title: t1,
+            body: b1,
+            read: false,
+            display_name: None,
+            description: None,
+            metadata: None,
+            created_at: DateTime::default(),
+            updated_at: DateTime::default(),
+        })
+        .unwrap();
 
     let mut t2 = LocalizedText::new();
     t2.set("en", "New Feature: Multi-language Support");
@@ -368,17 +430,35 @@ fn seed_demo_data(kv: &Arc<dyn openerp_kv::KVStore>) {
     t2.set("ja", "新機能：多言語サポート");
     t2.set("es", "Nueva función: Soporte multilingüe");
     let mut b2 = LocalizedText::new();
-    b2.set("en", "Switch between English, Chinese, Japanese and Spanish in Settings.");
+    b2.set(
+        "en",
+        "Switch between English, Chinese, Japanese and Spanish in Settings.",
+    );
     b2.set("zh-CN", "在设置中切换英文、中文、日文和西班牙文。");
-    b2.set("ja", "設定から英語・中国語・日本語・スペイン語を切り替えられます。");
-    b2.set("es", "Cambia entre inglés, chino, japonés y español en Configuración.");
-    msgs_ops.save_new(Message {
-        id: Id::default(), kind: "system".into(),
-        sender: None, recipient: None,
-        title: t2, body: b2, read: false,
-        display_name: None, description: None, metadata: None,
-        created_at: DateTime::default(), updated_at: DateTime::default(),
-    }).unwrap();
+    b2.set(
+        "ja",
+        "設定から英語・中国語・日本語・スペイン語を切り替えられます。",
+    );
+    b2.set(
+        "es",
+        "Cambia entre inglés, chino, japonés y español en Configuración.",
+    );
+    msgs_ops
+        .save_new(Message {
+            id: Id::default(),
+            kind: "system".into(),
+            sender: None,
+            recipient: None,
+            title: t2,
+            body: b2,
+            read: false,
+            display_name: None,
+            description: None,
+            metadata: None,
+            created_at: DateTime::default(),
+            updated_at: DateTime::default(),
+        })
+        .unwrap();
 
     let mut t3 = LocalizedText::en("Your account has been verified");
     t3.set("zh-CN", "你的账号已通过认证");
@@ -386,15 +466,30 @@ fn seed_demo_data(kv: &Arc<dyn openerp_kv::KVStore>) {
     t3.set("es", "Tu cuenta ha sido verificada");
     let mut b3 = LocalizedText::en("Congratulations! You now have access to the API dashboard.");
     b3.set("zh-CN", "恭喜！你现在可以访问 API 管理面板了。");
-    b3.set("ja", "おめでとうございます！APIダッシュボードにアクセスできます。");
-    b3.set("es", "¡Felicitaciones! Ahora tienes acceso al panel de API.");
-    msgs_ops.save_new(Message {
-        id: Id::default(), kind: "personal".into(),
-        sender: None, recipient: Some(Name::new("twitter/users/alice")),
-        title: t3, body: b3, read: false,
-        display_name: None, description: None, metadata: None,
-        created_at: DateTime::default(), updated_at: DateTime::default(),
-    }).unwrap();
+    b3.set(
+        "ja",
+        "おめでとうございます！APIダッシュボードにアクセスできます。",
+    );
+    b3.set(
+        "es",
+        "¡Felicitaciones! Ahora tienes acceso al panel de API.",
+    );
+    msgs_ops
+        .save_new(Message {
+            id: Id::default(),
+            kind: "personal".into(),
+            sender: None,
+            recipient: Some(Name::new("twitter/users/alice")),
+            title: t3,
+            body: b3,
+            read: false,
+            display_name: None,
+            description: None,
+            metadata: None,
+            created_at: DateTime::default(),
+            updated_at: DateTime::default(),
+        })
+        .unwrap();
 }
 
 // ============================================================================
@@ -403,43 +498,53 @@ fn seed_demo_data(kv: &Arc<dyn openerp_kv::KVStore>) {
 
 fn serialize_state(path: &str, value: &StateValue) -> Option<Vec<u8>> {
     if path == AuthState::PATH {
-        return value.downcast_ref::<AuthState>()
+        return value
+            .downcast_ref::<AuthState>()
             .and_then(|v| serde_json::to_vec(v).ok());
     }
     if path == TimelineFeed::PATH {
-        return value.downcast_ref::<TimelineFeed>()
+        return value
+            .downcast_ref::<TimelineFeed>()
             .and_then(|v| serde_json::to_vec(v).ok());
     }
     if path == ComposeState::PATH {
-        return value.downcast_ref::<ComposeState>()
+        return value
+            .downcast_ref::<ComposeState>()
             .and_then(|v| serde_json::to_vec(v).ok());
     }
     if path == AppRoute::PATH {
-        return value.downcast_ref::<AppRoute>()
+        return value
+            .downcast_ref::<AppRoute>()
             .and_then(|v| serde_json::to_vec(v).ok());
     }
     if path == SearchState::PATH {
-        return value.downcast_ref::<SearchState>()
+        return value
+            .downcast_ref::<SearchState>()
             .and_then(|v| serde_json::to_vec(v).ok());
     }
     if path == SettingsState::PATH {
-        return value.downcast_ref::<SettingsState>()
+        return value
+            .downcast_ref::<SettingsState>()
             .and_then(|v| serde_json::to_vec(v).ok());
     }
     if path == PasswordState::PATH {
-        return value.downcast_ref::<PasswordState>()
+        return value
+            .downcast_ref::<PasswordState>()
             .and_then(|v| serde_json::to_vec(v).ok());
     }
     if path.starts_with("profile/") {
-        return value.downcast_ref::<ProfilePage>()
+        return value
+            .downcast_ref::<ProfilePage>()
             .and_then(|v| serde_json::to_vec(v).ok());
     }
     if path.starts_with("tweet/") {
-        return value.downcast_ref::<TweetDetail>()
+        return value
+            .downcast_ref::<TweetDetail>()
             .and_then(|v| serde_json::to_vec(v).ok());
     }
     if path == InboxState::PATH {
-        return value.downcast_ref::<InboxState>()
+        return value
+            .downcast_ref::<InboxState>()
             .and_then(|v| serde_json::to_vec(v).ok());
     }
     None
@@ -448,114 +553,116 @@ fn serialize_state(path: &str, value: &StateValue) -> Option<Vec<u8>> {
 fn deserialize_request(path: &str, json: &str) -> Option<Arc<dyn Any + Send + Sync>> {
     match path {
         "app/initialize" => Some(Arc::new(InitializeReq)),
-        "auth/login" => {
-            serde_json::from_str::<serde_json::Value>(json).ok().map(|v| {
+        "auth/login" => serde_json::from_str::<serde_json::Value>(json)
+            .ok()
+            .map(|v| {
                 Arc::new(LoginReq {
                     username: v["username"].as_str().unwrap_or("").to_string(),
                     password: v["password"].as_str().unwrap_or("").to_string(),
                 }) as Arc<dyn Any + Send + Sync>
-            })
-        }
+            }),
         "auth/logout" => Some(Arc::new(LogoutReq)),
         "timeline/load" => Some(Arc::new(TimelineLoadReq)),
-        "tweet/create" => {
-            serde_json::from_str::<serde_json::Value>(json).ok().map(|v| {
+        "tweet/create" => serde_json::from_str::<serde_json::Value>(json)
+            .ok()
+            .map(|v| {
                 Arc::new(CreateTweetReq {
                     content: v["content"].as_str().unwrap_or("").to_string(),
                     reply_to_id: v["replyToId"].as_str().map(|s| s.to_string()),
                 }) as Arc<dyn Any + Send + Sync>
-            })
-        }
-        "tweet/like" => {
-            serde_json::from_str::<serde_json::Value>(json).ok().map(|v| {
+            }),
+        "tweet/like" => serde_json::from_str::<serde_json::Value>(json)
+            .ok()
+            .map(|v| {
                 Arc::new(LikeTweetReq {
                     tweet_id: v["tweetId"].as_str().unwrap_or("").to_string(),
                 }) as Arc<dyn Any + Send + Sync>
-            })
-        }
-        "tweet/unlike" => {
-            serde_json::from_str::<serde_json::Value>(json).ok().map(|v| {
+            }),
+        "tweet/unlike" => serde_json::from_str::<serde_json::Value>(json)
+            .ok()
+            .map(|v| {
                 Arc::new(UnlikeTweetReq {
                     tweet_id: v["tweetId"].as_str().unwrap_or("").to_string(),
                 }) as Arc<dyn Any + Send + Sync>
-            })
-        }
-        "tweet/load" => {
-            serde_json::from_str::<serde_json::Value>(json).ok().map(|v| {
+            }),
+        "tweet/load" => serde_json::from_str::<serde_json::Value>(json)
+            .ok()
+            .map(|v| {
                 Arc::new(LoadTweetReq {
                     tweet_id: v["tweetId"].as_str().unwrap_or("").to_string(),
                 }) as Arc<dyn Any + Send + Sync>
-            })
-        }
-        "user/follow" => {
-            serde_json::from_str::<serde_json::Value>(json).ok().map(|v| {
+            }),
+        "user/follow" => serde_json::from_str::<serde_json::Value>(json)
+            .ok()
+            .map(|v| {
                 Arc::new(FollowUserReq {
                     user_id: v["userId"].as_str().unwrap_or("").to_string(),
                 }) as Arc<dyn Any + Send + Sync>
-            })
-        }
-        "user/unfollow" => {
-            serde_json::from_str::<serde_json::Value>(json).ok().map(|v| {
+            }),
+        "user/unfollow" => serde_json::from_str::<serde_json::Value>(json)
+            .ok()
+            .map(|v| {
                 Arc::new(UnfollowUserReq {
                     user_id: v["userId"].as_str().unwrap_or("").to_string(),
                 }) as Arc<dyn Any + Send + Sync>
-            })
-        }
-        "profile/load" => {
-            serde_json::from_str::<serde_json::Value>(json).ok().map(|v| {
+            }),
+        "profile/load" => serde_json::from_str::<serde_json::Value>(json)
+            .ok()
+            .map(|v| {
                 Arc::new(LoadProfileReq {
                     user_id: v["userId"].as_str().unwrap_or("").to_string(),
                 }) as Arc<dyn Any + Send + Sync>
-            })
-        }
-        "search/query" => {
-            serde_json::from_str::<serde_json::Value>(json).ok().map(|v| {
+            }),
+        "search/query" => serde_json::from_str::<serde_json::Value>(json)
+            .ok()
+            .map(|v| {
                 Arc::new(SearchReq {
                     query: v["query"].as_str().unwrap_or("").to_string(),
                 }) as Arc<dyn Any + Send + Sync>
-            })
-        }
+            }),
         "search/clear" => Some(Arc::new(SearchClearReq)),
         "settings/load" => Some(Arc::new(SettingsLoadReq)),
-        "settings/save" => {
-            serde_json::from_str::<serde_json::Value>(json).ok().map(|v| {
+        "settings/save" => serde_json::from_str::<serde_json::Value>(json)
+            .ok()
+            .map(|v| {
                 Arc::new(SettingsSaveReq {
                     display_name: v["displayName"].as_str().unwrap_or("").to_string(),
                     bio: v["bio"].as_str().unwrap_or("").to_string(),
                 }) as Arc<dyn Any + Send + Sync>
-            })
-        }
+            }),
         "settings/change-password" => {
-            serde_json::from_str::<serde_json::Value>(json).ok().map(|v| {
-                Arc::new(ChangePasswordReq {
-                    old_password: v["oldPassword"].as_str().unwrap_or("").to_string(),
-                    new_password: v["newPassword"].as_str().unwrap_or("").to_string(),
-                }) as Arc<dyn Any + Send + Sync>
-            })
+            serde_json::from_str::<serde_json::Value>(json)
+                .ok()
+                .map(|v| {
+                    Arc::new(ChangePasswordReq {
+                        old_password: v["oldPassword"].as_str().unwrap_or("").to_string(),
+                        new_password: v["newPassword"].as_str().unwrap_or("").to_string(),
+                    }) as Arc<dyn Any + Send + Sync>
+                })
         }
-        "app/set-locale" => {
-            serde_json::from_str::<serde_json::Value>(json).ok().map(|v| {
+        "app/set-locale" => serde_json::from_str::<serde_json::Value>(json)
+            .ok()
+            .map(|v| {
                 Arc::new(SetLocaleReq {
                     locale: v["locale"].as_str().unwrap_or("en").to_string(),
                 }) as Arc<dyn Any + Send + Sync>
-            })
-        }
+            }),
         "inbox/load" => Some(Arc::new(InboxLoadReq)),
-        "inbox/mark-read" => {
-            serde_json::from_str::<serde_json::Value>(json).ok().map(|v| {
+        "inbox/mark-read" => serde_json::from_str::<serde_json::Value>(json)
+            .ok()
+            .map(|v| {
                 Arc::new(InboxMarkReadReq {
                     message_id: v["messageId"].as_str().unwrap_or("").to_string(),
                 }) as Arc<dyn Any + Send + Sync>
-            })
-        }
-        "compose/update-field" => {
-            serde_json::from_str::<serde_json::Value>(json).ok().map(|v| {
+            }),
+        "compose/update-field" => serde_json::from_str::<serde_json::Value>(json)
+            .ok()
+            .map(|v| {
                 Arc::new(ComposeUpdateReq {
                     field: v["field"].as_str().unwrap_or("").to_string(),
                     value: v["value"].as_str().unwrap_or("").to_string(),
                 }) as Arc<dyn Any + Send + Sync>
-            })
-        }
+            }),
         _ => None,
     }
 }

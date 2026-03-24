@@ -1,9 +1,9 @@
 //! Profile page state — stored at `profile/{user_id}`.
 
-use flux_derive::state;
-use serde::{Deserialize, Serialize};
 use super::auth::UserProfile;
 use super::timeline::FeedItem;
+use flux_derive::state;
+use serde::{Deserialize, Serialize};
 
 /// A user's profile page.
 #[state("profile")]

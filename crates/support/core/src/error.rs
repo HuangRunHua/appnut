@@ -114,25 +114,64 @@ mod tests {
 
     #[test]
     fn status_code_mapping() {
-        assert_eq!(ServiceError::NotFound("x".into()).status_code(), StatusCode::NOT_FOUND);
-        assert_eq!(ServiceError::Conflict("x".into()).status_code(), StatusCode::CONFLICT);
-        assert_eq!(ServiceError::Validation("x".into()).status_code(), StatusCode::BAD_REQUEST);
-        assert_eq!(ServiceError::Unauthorized("x".into()).status_code(), StatusCode::UNAUTHORIZED);
-        assert_eq!(ServiceError::PermissionDenied("x".into()).status_code(), StatusCode::FORBIDDEN);
-        assert_eq!(ServiceError::ReadOnly("x".into()).status_code(), StatusCode::FORBIDDEN);
-        assert_eq!(ServiceError::Storage("x".into()).status_code(), StatusCode::INTERNAL_SERVER_ERROR);
-        assert_eq!(ServiceError::Internal("x".into()).status_code(), StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(
+            ServiceError::NotFound("x".into()).status_code(),
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            ServiceError::Conflict("x".into()).status_code(),
+            StatusCode::CONFLICT
+        );
+        assert_eq!(
+            ServiceError::Validation("x".into()).status_code(),
+            StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            ServiceError::Unauthorized("x".into()).status_code(),
+            StatusCode::UNAUTHORIZED
+        );
+        assert_eq!(
+            ServiceError::PermissionDenied("x".into()).status_code(),
+            StatusCode::FORBIDDEN
+        );
+        assert_eq!(
+            ServiceError::ReadOnly("x".into()).status_code(),
+            StatusCode::FORBIDDEN
+        );
+        assert_eq!(
+            ServiceError::Storage("x".into()).status_code(),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+        assert_eq!(
+            ServiceError::Internal("x".into()).status_code(),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
     }
 
     #[test]
     fn error_code_mapping() {
         assert_eq!(ServiceError::NotFound("x".into()).error_code(), "NOT_FOUND");
-        assert_eq!(ServiceError::Conflict("x".into()).error_code(), "ALREADY_EXISTS");
-        assert_eq!(ServiceError::Validation("x".into()).error_code(), "VALIDATION_FAILED");
-        assert_eq!(ServiceError::Unauthorized("x".into()).error_code(), "UNAUTHENTICATED");
-        assert_eq!(ServiceError::PermissionDenied("x".into()).error_code(), "PERMISSION_DENIED");
+        assert_eq!(
+            ServiceError::Conflict("x".into()).error_code(),
+            "ALREADY_EXISTS"
+        );
+        assert_eq!(
+            ServiceError::Validation("x".into()).error_code(),
+            "VALIDATION_FAILED"
+        );
+        assert_eq!(
+            ServiceError::Unauthorized("x".into()).error_code(),
+            "UNAUTHENTICATED"
+        );
+        assert_eq!(
+            ServiceError::PermissionDenied("x".into()).error_code(),
+            "PERMISSION_DENIED"
+        );
         assert_eq!(ServiceError::ReadOnly("x".into()).error_code(), "READ_ONLY");
-        assert_eq!(ServiceError::Storage("x".into()).error_code(), "STORAGE_ERROR");
+        assert_eq!(
+            ServiceError::Storage("x".into()).error_code(),
+            "STORAGE_ERROR"
+        );
         assert_eq!(ServiceError::Internal("x".into()).error_code(), "INTERNAL");
     }
 
@@ -146,10 +185,25 @@ mod tests {
     #[test]
     fn error_display_is_just_message() {
         // Display no longer has "not found:" prefix — just the message.
-        assert_eq!(ServiceError::NotFound("user 123".into()).to_string(), "user 123");
-        assert_eq!(ServiceError::Conflict("dup key".into()).to_string(), "dup key");
-        assert_eq!(ServiceError::Validation("bad input".into()).to_string(), "bad input");
-        assert_eq!(ServiceError::Unauthorized("missing token".into()).to_string(), "missing token");
-        assert_eq!(ServiceError::PermissionDenied("no access".into()).to_string(), "no access");
+        assert_eq!(
+            ServiceError::NotFound("user 123".into()).to_string(),
+            "user 123"
+        );
+        assert_eq!(
+            ServiceError::Conflict("dup key".into()).to_string(),
+            "dup key"
+        );
+        assert_eq!(
+            ServiceError::Validation("bad input".into()).to_string(),
+            "bad input"
+        );
+        assert_eq!(
+            ServiceError::Unauthorized("missing token".into()).to_string(),
+            "missing token"
+        );
+        assert_eq!(
+            ServiceError::PermissionDenied("no access".into()).to_string(),
+            "no access"
+        );
     }
 }

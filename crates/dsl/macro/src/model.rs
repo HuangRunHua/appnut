@@ -1,19 +1,26 @@
 //! `#[model]` macro expansion.
 
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote, ToTokens};
+use quote::{ToTokens, format_ident, quote};
 use syn::{Fields, ItemStruct, Lit};
 
 pub fn expand(attr: TokenStream, item: ItemStruct) -> syn::Result<TokenStream> {
     // Parse module name and optional name template from attr.
-    let ModelAttrs { module, name_template } = parse_model_attrs(attr)?;
+    let ModelAttrs {
+        module,
+        name_template,
+    } = parse_model_attrs(attr)?;
 
     let struct_name = &item.ident;
     let struct_name_str = struct_name.to_string();
     let vis = &item.vis;
 
     // Collect doc attrs.
-    let doc_attrs: Vec<_> = item.attrs.iter().filter(|a| a.path().is_ident("doc")).collect();
+    let doc_attrs: Vec<_> = item
+        .attrs
+        .iter()
+        .filter(|a| a.path().is_ident("doc"))
+        .collect();
 
     // Collect non-DSL attrs to pass through.
     let pass_attrs: Vec<_> = item
@@ -25,7 +32,12 @@ pub fn expand(attr: TokenStream, item: ItemStruct) -> syn::Result<TokenStream> {
     // Parse fields.
     let named = match &item.fields {
         Fields::Named(n) => n,
-        _ => return Err(syn::Error::new_spanned(&item.ident, "model must have named fields")),
+        _ => {
+            return Err(syn::Error::new_spanned(
+                &item.ident,
+                "model must have named fields",
+            ));
+        }
     };
 
     // ── id / name mutual exclusion check ──
@@ -43,10 +55,10 @@ pub fn expand(attr: TokenStream, item: ItemStruct) -> syn::Result<TokenStream> {
     //   - `id: Id` + `name = ".../{sn}"` → conflicting identity
     if let Some(ref tmpl) = name_template {
         let (_, key_field) = parse_name_template(tmpl)?;
-        let has_id_field = named.named.iter().any(|f| {
-            f.ident.as_ref().map(|i| i == "id").unwrap_or(false)
-                && is_type_id(&f.ty)
-        });
+        let has_id_field = named
+            .named
+            .iter()
+            .any(|f| f.ident.as_ref().map(|i| i == "id").unwrap_or(false) && is_type_id(&f.ty));
         if has_id_field && key_field != "id" {
             return Err(syn::Error::new_spanned(
                 &item.ident,
@@ -165,10 +177,13 @@ pub fn expand(attr: TokenStream, item: ItemStruct) -> syn::Result<TokenStream> {
         let is_known_enum = KNOWN_DSL_ENUMS.contains(&inner_ty.as_str());
 
         if let Some(ref targets) = name_ref_targets {
-            let targets_json: Vec<_> = targets.iter().map(|t| {
-                let snake = to_snake_case(t);
-                quote! { serde_json::json!({ "type": #t, "resource": #snake }) }
-            }).collect();
+            let targets_json: Vec<_> = targets
+                .iter()
+                .map(|t| {
+                    let snake = to_snake_case(t);
+                    quote! { serde_json::json!({ "type": #t, "resource": #snake }) }
+                })
+                .collect();
             field_ir_entries.push(quote! {
                 {
                     let mut __entry = serde_json::json!({
@@ -305,9 +320,7 @@ fn parse_model_attrs(attr: TokenStream) -> syn::Result<ModelAttrs> {
     impl syn::parse::Parse for AttrArgs {
         fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
             let parsed =
-                syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated(
-                    input,
-                )?;
+                syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated(input)?;
             Ok(Self(parsed.into_iter().collect()))
         }
     }
@@ -343,7 +356,10 @@ fn parse_model_attrs(attr: TokenStream) -> syn::Result<ModelAttrs> {
         )
     })?;
 
-    Ok(ModelAttrs { module, name_template })
+    Ok(ModelAttrs {
+        module,
+        name_template,
+    })
 }
 
 /// Parse a name template like `"auth/users/{id}"` into prefix `"auth/users/"` and key field `"id"`.
@@ -449,13 +465,17 @@ fn extract_name_ref_targets(ty: &syn::Type) -> Option<Vec<String>> {
 /// `User` → `["User"]`, `(User, Device)` → `["User", "Device"]`, `()` → `[]`.
 fn extract_tuple_type_names(ty: &syn::Type) -> Vec<String> {
     if let syn::Type::Tuple(tuple) = ty {
-        return tuple.elems.iter().filter_map(|t| {
-            if let syn::Type::Path(tp) = t {
-                tp.path.segments.last().map(|s| s.ident.to_string())
-            } else {
-                None
-            }
-        }).collect();
+        return tuple
+            .elems
+            .iter()
+            .filter_map(|t| {
+                if let syn::Type::Path(tp) = t {
+                    tp.path.segments.last().map(|s| s.ident.to_string())
+                } else {
+                    None
+                }
+            })
+            .collect();
     }
     if let syn::Type::Path(tp) = ty {
         if let Some(seg) = tp.path.segments.last() {
@@ -529,13 +549,36 @@ fn extract_ui_widget(attrs: &[syn::Attribute]) -> syn::Result<Option<String>> {
 /// **Must stay in sync with `openerp_types::_BUILTIN_TYPES`.**
 /// Duplicated here because proc-macro crates cannot depend on runtime crates.
 const _BUILTIN_TYPES: &[&str] = &[
-    "Id", "Email", "Phone", "Url", "Avatar", "ImageUrl",
-    "Password", "PasswordHash", "Secret",
-    "Text", "Markdown", "Code",
-    "DateTime", "Date", "Color", "SemVer",
+    "Id",
+    "Email",
+    "Phone",
+    "Url",
+    "Avatar",
+    "ImageUrl",
+    "Password",
+    "PasswordHash",
+    "Secret",
+    "Text",
+    "Markdown",
+    "Code",
+    "DateTime",
+    "Date",
+    "Color",
+    "SemVer",
     "Name",
-    "String", "bool", "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64",
-    "f32", "f64", "Vec",
+    "String",
+    "bool",
+    "u8",
+    "u16",
+    "u32",
+    "u64",
+    "i8",
+    "i16",
+    "i32",
+    "i64",
+    "f32",
+    "f64",
+    "Vec",
 ];
 
 fn infer_widget(ty_name: &str, field_name: &str) -> &'static str {
@@ -574,8 +617,14 @@ fn infer_widget(ty_name: &str, field_name: &str) -> &'static str {
 /// Known #[dsl_enum] types in the codebase.
 /// These are manually maintained — when adding a new #[dsl_enum], update this list.
 const KNOWN_DSL_ENUMS: &[&str] = &[
-    "TaskStatus", "TaskPriority", "BatchStatus", "ProvisionStatus",
-    "DeviceStatus", "Priority", "Status", "ItemStatus",
+    "TaskStatus",
+    "TaskPriority",
+    "BatchStatus",
+    "ProvisionStatus",
+    "DeviceStatus",
+    "Priority",
+    "Status",
+    "ItemStatus",
 ];
 
 /// Check if a type is a known #[dsl_enum] type.
@@ -603,8 +652,11 @@ fn pluralize(s: &str) -> String {
             }
         }
         format!("{}s", s)
-    } else if s.ends_with('s') || s.ends_with('x') || s.ends_with('z')
-        || s.ends_with("sh") || s.ends_with("ch")
+    } else if s.ends_with('s')
+        || s.ends_with('x')
+        || s.ends_with('z')
+        || s.ends_with("sh")
+        || s.ends_with("ch")
     {
         format!("{}es", s)
     } else {

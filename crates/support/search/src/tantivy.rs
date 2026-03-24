@@ -4,9 +4,9 @@ use std::sync::RwLock;
 
 use tantivy::collector::TopDocs;
 use tantivy::query::QueryParser;
-use tantivy::schema::{Field, Schema, STORED, STRING, TEXT};
 use tantivy::schema::Value as TantivyValue;
-use tantivy::{doc, Index, IndexReader, IndexWriter, ReloadPolicy, TantivyDocument};
+use tantivy::schema::{Field, STORED, STRING, Schema, TEXT};
+use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy, TantivyDocument, doc};
 
 use crate::error::SearchError;
 use crate::traits::{SearchEngine, SearchResult};
@@ -36,8 +36,7 @@ pub struct TantivyEngine {
 impl TantivyEngine {
     /// Create a new TantivyEngine with indexes stored under `base_dir`.
     pub fn open(base_dir: &Path) -> Result<Self, SearchError> {
-        std::fs::create_dir_all(base_dir)
-            .map_err(|e| SearchError::Index(e.to_string()))?;
+        std::fs::create_dir_all(base_dir).map_err(|e| SearchError::Index(e.to_string()))?;
 
         Ok(Self {
             base_dir: base_dir.to_path_buf(),
@@ -46,10 +45,7 @@ impl TantivyEngine {
     }
 
     /// Get or create a collection index.
-    fn get_or_create_collection(
-        &self,
-        collection: &str,
-    ) -> Result<(), SearchError> {
+    fn get_or_create_collection(&self, collection: &str) -> Result<(), SearchError> {
         // Fast path: already exists.
         {
             let collections = self.collections.read().unwrap();
@@ -65,8 +61,7 @@ impl TantivyEngine {
         }
 
         let col_dir = self.base_dir.join(collection);
-        std::fs::create_dir_all(&col_dir)
-            .map_err(|e| SearchError::Index(e.to_string()))?;
+        std::fs::create_dir_all(&col_dir).map_err(|e| SearchError::Index(e.to_string()))?;
 
         let mut schema_builder = Schema::builder();
         let id_field = schema_builder.add_text_field("_id", STRING | STORED);
@@ -123,8 +118,8 @@ impl SearchEngine for TantivyEngine {
         // _body: concatenated field values only (no JSON keys polluting the index).
         let body_text: String = doc_fields.values().cloned().collect::<Vec<_>>().join(" ");
         // _fields: JSON for retrieval on the read path (STORED only, not indexed).
-        let fields_json = serde_json::to_string(&doc_fields)
-            .map_err(|e| SearchError::Index(e.to_string()))?;
+        let fields_json =
+            serde_json::to_string(&doc_fields).map_err(|e| SearchError::Index(e.to_string()))?;
 
         let mut writer = col.writer.write().unwrap();
 
@@ -186,8 +181,7 @@ impl SearchEngine for TantivyEngine {
         let searcher = col.reader.searcher();
         // Only search the _body field by default. _id is STRING (untokenized)
         // and not suitable for full-text queries.
-        let query_parser =
-            QueryParser::for_index(&col.index, vec![col.body_field]);
+        let query_parser = QueryParser::for_index(&col.index, vec![col.body_field]);
 
         let parsed = query_parser
             .parse_query(query)
@@ -215,8 +209,8 @@ impl SearchEngine for TantivyEngine {
                 .and_then(|v| v.as_str())
                 .unwrap_or_default();
 
-            let fields = serde_json::from_str::<HashMap<String, String>>(fields_json)
-                .unwrap_or_default();
+            let fields =
+                serde_json::from_str::<HashMap<String, String>>(fields_json).unwrap_or_default();
 
             results.push(SearchResult { id, score, fields });
         }

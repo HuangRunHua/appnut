@@ -18,7 +18,7 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 
 use openerp_types::{DslModel, Format, FromFlatBuffer, FromFlatBufferList, MIME_FLATBUFFERS};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 // ── Error ───────────────────────────────────────────────────────────
 
@@ -34,7 +34,11 @@ pub enum ApiError {
     /// - `code`: stable error code from server (e.g. "NOT_FOUND", "ALREADY_EXISTS")
     /// - `message`: human-readable error message
     #[error("HTTP {status} [{code}]: {message}")]
-    Server { status: u16, code: String, message: String },
+    Server {
+        status: u16,
+        code: String,
+        message: String,
+    },
 
     /// Network-level failure (DNS, connection refused, timeout, etc.).
     #[error("network: {0}")]
@@ -132,16 +136,22 @@ impl ApiError {
     /// Falls back to legacy `{"error": "..."}` or raw text.
     fn from_response_body(status: u16, body: &str) -> Self {
         if let Ok(v) = serde_json::from_str::<serde_json::Value>(body) {
-            let code = v.get("code")
+            let code = v
+                .get("code")
                 .and_then(|c| c.as_str())
                 .unwrap_or("UNKNOWN")
                 .to_string();
-            let message = v.get("message")
+            let message = v
+                .get("message")
                 .or_else(|| v.get("error"))
                 .and_then(|m| m.as_str())
                 .unwrap_or(body)
                 .to_string();
-            return ApiError::Server { status, code, message };
+            return ApiError::Server {
+                status,
+                code,
+                message,
+            };
         }
         ApiError::Server {
             status,
@@ -211,7 +221,11 @@ struct LoginResponse {
 }
 
 impl PasswordLogin {
-    pub fn new(base_url: impl Into<String>, username: impl Into<String>, password: impl Into<String>) -> Self {
+    pub fn new(
+        base_url: impl Into<String>,
+        username: impl Into<String>,
+        password: impl Into<String>,
+    ) -> Self {
         Self {
             http: reqwest::Client::new(),
             base_url: base_url.into().trim_end_matches('/').to_string(),
@@ -223,7 +237,9 @@ impl PasswordLogin {
 
     async fn do_login(&self) -> Result<CachedToken, ApiError> {
         let url = format!("{}/auth/login", self.base_url);
-        let resp = self.http.post(&url)
+        let resp = self
+            .http
+            .post(&url)
             .json(&serde_json::json!({
                 "username": self.username,
                 "password": self.password,
@@ -234,10 +250,15 @@ impl PasswordLogin {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let body = resp.text().await.unwrap_or_default();
-            return Err(ApiError::Auth(format!("login failed ({}): {}", status, body)));
+            return Err(ApiError::Auth(format!(
+                "login failed ({}): {}",
+                status, body
+            )));
         }
 
-        let lr: LoginResponse = resp.json().await
+        let lr: LoginResponse = resp
+            .json()
+            .await
             .map_err(|e| ApiError::Decode(format!("login response: {}", e)))?;
 
         let now = chrono::Utc::now().timestamp();
@@ -335,7 +356,12 @@ impl<T: DslModel> ResourceClient<T> {
 
     /// Base URL for this resource: `/admin/{module}/{path}`.
     fn collection_url(&self) -> String {
-        format!("{}/admin/{}/{}", self.base_url, T::module(), T::resource_path())
+        format!(
+            "{}/admin/{}/{}",
+            self.base_url,
+            T::module(),
+            T::resource_path()
+        )
     }
 
     /// URL for a single item: `/admin/{module}/{path}/{id}`.
@@ -344,7 +370,10 @@ impl<T: DslModel> ResourceClient<T> {
     }
 
     /// Build a request with auth header.
-    async fn authed(&self, builder: reqwest::RequestBuilder) -> Result<reqwest::RequestBuilder, ApiError> {
+    async fn authed(
+        &self,
+        builder: reqwest::RequestBuilder,
+    ) -> Result<reqwest::RequestBuilder, ApiError> {
         match self.token_source.token().await? {
             Some(token) => Ok(builder.bearer_auth(token)),
             None => Ok(builder),
@@ -359,7 +388,8 @@ impl<T: DslModel> ResourceClient<T> {
             let body = resp.text().await.unwrap_or_default();
             return Err(ApiError::from_response_body(code, &body));
         }
-        resp.json::<R>().await
+        resp.json::<R>()
+            .await
             .map_err(|e| ApiError::Decode(format!("response body: {}", e)))
     }
 
@@ -583,17 +613,18 @@ impl FacetClientBase {
 
         match Self::response_format(&resp) {
             Format::FlatBuffers => {
-                let bytes = resp.bytes().await
+                let bytes = resp
+                    .bytes()
+                    .await
                     .map_err(|e| ApiError::Decode(e.to_string()))?;
                 let (items, has_more) = T::decode_flatbuffer_list(&bytes)
                     .map_err(|e| ApiError::Decode(e.to_string()))?;
                 Ok(ListResult { items, has_more })
             }
-            Format::Json => {
-                resp.json::<ListResult<T>>()
-                    .await
-                    .map_err(|e| ApiError::Decode(e.to_string()))
-            }
+            Format::Json => resp
+                .json::<ListResult<T>>()
+                .await
+                .map_err(|e| ApiError::Decode(e.to_string())),
         }
     }
 
@@ -617,16 +648,16 @@ impl FacetClientBase {
 
         match Self::response_format(&resp) {
             Format::FlatBuffers => {
-                let bytes = resp.bytes().await
-                    .map_err(|e| ApiError::Decode(e.to_string()))?;
-                T::decode_flatbuffer(&bytes)
-                    .map_err(|e| ApiError::Decode(e.to_string()))
-            }
-            Format::Json => {
-                resp.json::<T>()
+                let bytes = resp
+                    .bytes()
                     .await
-                    .map_err(|e| ApiError::Decode(e.to_string()))
+                    .map_err(|e| ApiError::Decode(e.to_string()))?;
+                T::decode_flatbuffer(&bytes).map_err(|e| ApiError::Decode(e.to_string()))
             }
+            Format::Json => resp
+                .json::<T>()
+                .await
+                .map_err(|e| ApiError::Decode(e.to_string())),
         }
     }
 
@@ -644,10 +675,7 @@ impl FacetClientBase {
     }
 
     /// POST without a body (actions — always JSON).
-    pub async fn post_empty<Resp: DeserializeOwned>(
-        &self,
-        path: &str,
-    ) -> Result<Resp, ApiError> {
+    pub async fn post_empty<Resp: DeserializeOwned>(&self, path: &str) -> Result<Resp, ApiError> {
         let url = format!("{}{}", self.base_url, path);
         let req = self.http.post(&url);
         let req = self.authed(req).await?;
@@ -669,10 +697,7 @@ impl FacetClientBase {
     }
 
     /// PUT without a body (actions — always JSON).
-    pub async fn put_empty<Resp: DeserializeOwned>(
-        &self,
-        path: &str,
-    ) -> Result<Resp, ApiError> {
+    pub async fn put_empty<Resp: DeserializeOwned>(&self, path: &str) -> Result<Resp, ApiError> {
         let url = format!("{}{}", self.base_url, path);
         let req = self.http.put(&url);
         let req = self.authed(req).await?;
@@ -862,10 +887,17 @@ mod tests {
 
     #[test]
     fn list_params_builds_query_string() {
-        let p = ListParams { limit: Some(20), offset: Some(40) };
+        let p = ListParams {
+            limit: Some(20),
+            offset: Some(40),
+        };
         let mut parts = Vec::new();
-        if let Some(limit) = p.limit { parts.push(format!("limit={}", limit)); }
-        if let Some(offset) = p.offset { parts.push(format!("offset={}", offset)); }
+        if let Some(limit) = p.limit {
+            parts.push(format!("limit={}", limit));
+        }
+        if let Some(offset) = p.offset {
+            parts.push(format!("offset={}", offset));
+        }
         assert_eq!(parts.join("&"), "limit=20&offset=40");
     }
 

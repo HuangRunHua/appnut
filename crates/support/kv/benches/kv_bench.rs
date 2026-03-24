@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use tempfile::TempDir;
 
 use openerp_kv::{KVStore, OverlayKV, RedbStore};
@@ -11,7 +11,9 @@ fn bench_redb_set(c: &mut Criterion) {
         let mut i = 0u64;
         b.iter(|| {
             let key = format!("bench:key:{}", i);
-            store.set(black_box(&key), black_box(b"hello world")).unwrap();
+            store
+                .set(black_box(&key), black_box(b"hello world"))
+                .unwrap();
             i += 1;
         });
     });

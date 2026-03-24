@@ -22,3 +22,15 @@ example/twitter_flux/.packages
 example/twitter_flux/build/
 example/twitter_flux/.flutter-plugins
 example/twitter_flux/.flutter-plugins-dependencies
+example/twitter_flux/.idea/
+example/twitter_flux/*.iml
+example/twitter_flux/android/local.properties
+example/twitter_flux/android/*.iml
+example/twitter_flux/android/gradle/wrapper/gradle-wrapper.jar
+example/twitter_flux/android/gradlew
+example/twitter_flux/android/gradlew.bat
+example/twitter_flux/android/**/GeneratedPluginRegistrant.*
+example/twitter_flux/ios/Flutter/Generated.xcconfig
+example/twitter_flux/ios/Flutter/ephemeral/
+example/twitter_flux/ios/Flutter/flutter_export_environment.sh
+example/twitter_flux/ios/Runner/GeneratedPluginRegistrant.*

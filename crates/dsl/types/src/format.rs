@@ -131,10 +131,7 @@ pub fn create_string_vector<'a>(
     builder: &mut FlatBufferBuilder<'a>,
     strings: &[String],
 ) -> flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>> {
-    let offsets: Vec<_> = strings
-        .iter()
-        .map(|s| builder.create_string(s))
-        .collect();
+    let offsets: Vec<_> = strings.iter().map(|s| builder.create_string(s)).collect();
     builder.create_vector(&offsets)
 }
 

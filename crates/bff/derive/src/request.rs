@@ -12,7 +12,9 @@ pub fn expand(attr: TokenStream, item: ItemStruct) -> syn::Result<TokenStream> {
     let struct_name = &item.ident;
     let vis = &item.vis;
 
-    let doc_attrs: Vec<_> = item.attrs.iter()
+    let doc_attrs: Vec<_> = item
+        .attrs
+        .iter()
         .filter(|a| a.path().is_ident("doc"))
         .collect();
 
@@ -25,10 +27,14 @@ pub fn expand(attr: TokenStream, item: ItemStruct) -> syn::Result<TokenStream> {
         extra_derives.push(quote!(Clone));
     }
 
-    let user_derive_attrs: Vec<_> = item.attrs.iter()
+    let user_derive_attrs: Vec<_> = item
+        .attrs
+        .iter()
         .filter(|a| a.path().is_ident("derive"))
         .collect();
-    let other_attrs: Vec<_> = item.attrs.iter()
+    let other_attrs: Vec<_> = item
+        .attrs
+        .iter()
         .filter(|a| !a.path().is_ident("derive") && !a.path().is_ident("doc"))
         .collect();
 

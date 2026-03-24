@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use tempfile::TempDir;
 
 use openerp_blob::{BlobStore, FileStore};
@@ -74,5 +74,11 @@ fn bench_list(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, bench_put_1kb, bench_put_1mb, bench_get_1kb, bench_list);
+criterion_group!(
+    benches,
+    bench_put_1kb,
+    bench_put_1mb,
+    bench_get_1kb,
+    bench_list
+);
 criterion_main!(benches);

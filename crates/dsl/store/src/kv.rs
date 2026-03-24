@@ -5,7 +5,7 @@
 
 use openerp_core::ServiceError;
 use openerp_types::{DslModel, Field};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use std::sync::Arc;
 
 /// Compile-time assertion: KvStore KEY field must match NameTemplate key field.
@@ -109,9 +109,8 @@ impl<T: KvStore + DslModel> KvOps<T> {
 
     /// Get a record or return NotFound error.
     pub fn get_or_err(&self, id: &str) -> Result<T, ServiceError> {
-        self.get(id)?.ok_or_else(|| {
-            ServiceError::NotFound(format!("{} '{}' not found", T::KEY.name, id))
-        })
+        self.get(id)?
+            .ok_or_else(|| ServiceError::NotFound(format!("{} '{}' not found", T::KEY.name, id)))
     }
 
     /// List all records with this prefix.
@@ -159,7 +158,8 @@ impl<T: KvStore + DslModel> KvOps<T> {
         let invalid = <T as DslModel>::validate_names(record);
         if let Some((field, value)) = invalid.first() {
             return Err(ServiceError::Validation(format!(
-                "invalid resource name in field '{}': '{}'", field, value
+                "invalid resource name in field '{}': '{}'",
+                field, value
             )));
         }
         Ok(())
@@ -177,7 +177,8 @@ impl<T: KvStore + DslModel> KvOps<T> {
         if self.kv.get(&key).map_err(Self::kv_err)?.is_some() {
             return Err(ServiceError::Conflict(format!(
                 "{} '{}' already exists",
-                T::KEY.name, id
+                T::KEY.name,
+                id
             )));
         }
 
@@ -210,8 +211,14 @@ impl<T: KvStore + DslModel> KvOps<T> {
             let incoming = serde_json::to_value(&record)
                 .map_err(|e| ServiceError::Internal(format!("serialize: {}", e)))?;
 
-            let existing_ts = existing.get("updatedAt").and_then(|v| v.as_str()).unwrap_or("");
-            let incoming_ts = incoming.get("updatedAt").and_then(|v| v.as_str()).unwrap_or("");
+            let existing_ts = existing
+                .get("updatedAt")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let incoming_ts = incoming
+                .get("updatedAt")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
 
             if incoming_ts != existing_ts {
                 return Err(ServiceError::Conflict(format!(
@@ -325,9 +332,15 @@ mod tests {
     }
 
     impl DslModel for Thing {
-        fn module() -> &'static str { "test" }
-        fn resource() -> &'static str { "thing" }
-        fn resource_path() -> &'static str { "things" }
+        fn module() -> &'static str {
+            "test"
+        }
+        fn resource() -> &'static str {
+            "thing"
+        }
+        fn resource_path() -> &'static str {
+            "things"
+        }
     }
 
     fn make_ops() -> (KvOps<Thing>, tempfile::TempDir) {
@@ -338,7 +351,13 @@ mod tests {
     }
 
     fn new_thing(id: &str, name: &str, count: u32) -> Thing {
-        Thing { id: id.into(), name: name.into(), count, created_at: String::new(), updated_at: String::new() }
+        Thing {
+            id: id.into(),
+            name: name.into(),
+            count,
+            created_at: String::new(),
+            updated_at: String::new(),
+        }
     }
 
     #[test]
@@ -403,16 +422,25 @@ mod tests {
 
         let t = new_thing("ro1", "Changed", 2);
         let err = ops.save(t.clone()).unwrap_err();
-        assert!(err.to_string().contains("read-only") || err.to_string().contains("ReadOnly"),
-            "Save to readonly key should fail, got: {}", err);
+        assert!(
+            err.to_string().contains("read-only") || err.to_string().contains("ReadOnly"),
+            "Save to readonly key should fail, got: {}",
+            err
+        );
 
         let err = ops.delete("ro1").unwrap_err();
-        assert!(err.to_string().contains("read-only") || err.to_string().contains("ReadOnly"),
-            "Delete of readonly key should fail, got: {}", err);
+        assert!(
+            err.to_string().contains("read-only") || err.to_string().contains("ReadOnly"),
+            "Delete of readonly key should fail, got: {}",
+            err
+        );
 
         let err = ops.save_new(new_thing("ro1", "Dup", 0)).unwrap_err();
-        assert!(err.to_string().contains("already exists"),
-            "save_new of existing readonly key should fail with duplicate, got: {}", err);
+        assert!(
+            err.to_string().contains("already exists"),
+            "save_new of existing readonly key should fail with duplicate, got: {}",
+            err
+        );
     }
 
     #[test]
@@ -427,25 +455,42 @@ mod tests {
         let (ops, _dir) = make_ops();
 
         for i in 0..5u32 {
-            ops.save_new(new_thing(&format!("p{}", i), &format!("Item {}", i), i)).unwrap();
+            ops.save_new(new_thing(&format!("p{}", i), &format!("Item {}", i), i))
+                .unwrap();
         }
 
-        let params = openerp_core::ListParams { limit: 2, offset: 0, ..Default::default() };
+        let params = openerp_core::ListParams {
+            limit: 2,
+            offset: 0,
+            ..Default::default()
+        };
         let result = ops.list_paginated(&params).unwrap();
         assert_eq!(result.items.len(), 2);
         assert!(result.has_more);
 
-        let params = openerp_core::ListParams { limit: 2, offset: 2, ..Default::default() };
+        let params = openerp_core::ListParams {
+            limit: 2,
+            offset: 2,
+            ..Default::default()
+        };
         let result = ops.list_paginated(&params).unwrap();
         assert_eq!(result.items.len(), 2);
         assert!(result.has_more);
 
-        let params = openerp_core::ListParams { limit: 2, offset: 4, ..Default::default() };
+        let params = openerp_core::ListParams {
+            limit: 2,
+            offset: 4,
+            ..Default::default()
+        };
         let result = ops.list_paginated(&params).unwrap();
         assert_eq!(result.items.len(), 1);
         assert!(!result.has_more);
 
-        let params = openerp_core::ListParams { limit: 10, offset: 100, ..Default::default() };
+        let params = openerp_core::ListParams {
+            limit: 10,
+            offset: 100,
+            ..Default::default()
+        };
         let result = ops.list_paginated(&params).unwrap();
         assert_eq!(result.items.len(), 0);
         assert!(!result.has_more);
@@ -469,7 +514,10 @@ mod tests {
     fn updated_at_set_on_create() {
         let (ops, _dir) = make_ops();
         let created = ops.save_new(new_thing("v1", "A", 1)).unwrap();
-        assert!(!created.updated_at.is_empty(), "updatedAt should be set after create");
+        assert!(
+            !created.updated_at.is_empty(),
+            "updatedAt should be set after create"
+        );
 
         let fetched = ops.get_or_err("v1").unwrap();
         assert_eq!(fetched.updated_at, created.updated_at);
@@ -488,7 +536,10 @@ mod tests {
         let mut w = fetched;
         w.name = "B".into();
         let updated = ops.save(w).unwrap();
-        assert_ne!(updated.updated_at, old_ts, "updatedAt should change on update");
+        assert_ne!(
+            updated.updated_at, old_ts,
+            "updatedAt should change on update"
+        );
 
         let re_read = ops.get_or_err("v2").unwrap();
         assert_eq!(re_read.updated_at, updated.updated_at);
@@ -513,8 +564,11 @@ mod tests {
         let mut w2 = read2;
         w2.name = "Updated by w2".into();
         let err = ops.save(w2).unwrap_err();
-        assert!(err.to_string().contains("updatedAt mismatch"),
-            "Expected updatedAt conflict, got: {}", err);
+        assert!(
+            err.to_string().contains("updatedAt mismatch"),
+            "Expected updatedAt conflict, got: {}",
+            err
+        );
 
         let final_read = ops.get_or_err("v3").unwrap();
         assert_eq!(final_read.name, "Updated by w1");
@@ -559,8 +613,11 @@ mod tests {
         // Second patch with stale updatedAt should fail.
         let patch2 = serde_json::json!({ "name": "C", "updatedAt": old_ts });
         let err = ops.patch("p3", &patch2).unwrap_err();
-        assert!(err.to_string().contains("updatedAt mismatch"),
-            "Expected updatedAt conflict, got: {}", err);
+        assert!(
+            err.to_string().contains("updatedAt mismatch"),
+            "Expected updatedAt conflict, got: {}",
+            err
+        );
     }
 
     #[test]

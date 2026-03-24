@@ -158,9 +158,7 @@ impl FileStore {
                 if let Ok(rel) = path.strip_prefix(&self.base_dir) {
                     let key = rel.to_string_lossy().to_string();
                     if key.starts_with(prefix) {
-                        let meta = entry
-                            .metadata()
-                            .map_err(|e| BlobError::Io(e.to_string()))?;
+                        let meta = entry.metadata().map_err(|e| BlobError::Io(e.to_string()))?;
                         results.push(BlobMeta {
                             key,
                             size: meta.len(),

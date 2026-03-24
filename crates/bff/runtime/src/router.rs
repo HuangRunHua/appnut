@@ -42,9 +42,7 @@ pub struct Router {
 impl Router {
     /// Create a new empty router.
     pub fn new() -> Self {
-        Self {
-            trie: Trie::new(),
-        }
+        Self { trie: Trie::new() }
     }
 
     /// Register an async handler for a path pattern.
@@ -129,9 +127,7 @@ mod tests {
         });
 
         let store = test_store();
-        router
-            .dispatch("auth/login", Arc::new(()), store)
-            .await;
+        router.dispatch("auth/login", Arc::new(()), store).await;
 
         assert_eq!(called.load(Ordering::Relaxed), 1);
     }
@@ -150,9 +146,7 @@ mod tests {
         });
 
         let store = test_store();
-        router
-            .dispatch("auth/logout", Arc::new(()), store)
-            .await;
+        router.dispatch("auth/logout", Arc::new(()), store).await;
 
         assert_eq!(called.load(Ordering::Relaxed), 0);
     }
@@ -171,9 +165,7 @@ mod tests {
         });
 
         let store = test_store();
-        router
-            .dispatch("auth/login", Arc::new(()), store)
-            .await;
+        router.dispatch("auth/login", Arc::new(()), store).await;
 
         assert_eq!(*received_path.read().unwrap(), "auth/login");
     }
@@ -231,9 +223,7 @@ mod tests {
         });
 
         let store = test_store();
-        router
-            .dispatch("test", Arc::new(42u32), store)
-            .await;
+        router.dispatch("test", Arc::new(42u32), store).await;
 
         assert_eq!(got_none.load(Ordering::Relaxed), 1);
     }
@@ -246,9 +236,12 @@ mod tests {
     async fn handler_updates_store() {
         let router = Router::new();
 
-        router.on("auth/login", |_path, _payload, store: Arc<StateStore>| async move {
-            store.set("auth/state", "authenticated".to_string());
-        });
+        router.on(
+            "auth/login",
+            |_path, _payload, store: Arc<StateStore>| async move {
+                store.set("auth/state", "authenticated".to_string());
+            },
+        );
 
         let store = test_store();
         router
@@ -270,13 +263,16 @@ mod tests {
         let store = test_store();
         store.set("counter", 0u32);
 
-        router.on("increment", |_path, _payload, store: Arc<StateStore>| async move {
-            let current = store
-                .get("counter")
-                .and_then(|v| v.downcast_ref::<u32>().copied())
-                .unwrap_or(0);
-            store.set("counter", current + 1);
-        });
+        router.on(
+            "increment",
+            |_path, _payload, store: Arc<StateStore>| async move {
+                let current = store
+                    .get("counter")
+                    .and_then(|v| v.downcast_ref::<u32>().copied())
+                    .unwrap_or(0);
+                store.set("counter", current + 1);
+            },
+        );
 
         router
             .dispatch("increment", Arc::new(()), Arc::clone(&store))
@@ -387,21 +383,25 @@ mod tests {
 
         router.on("auth/login", move |_, _, _| {
             let e = e.clone();
-            async move { e.fetch_add(1, Ordering::Relaxed); }
+            async move {
+                e.fetch_add(1, Ordering::Relaxed);
+            }
         });
         router.on("auth/+", move |_, _, _| {
             let w = w.clone();
-            async move { w.fetch_add(1, Ordering::Relaxed); }
+            async move {
+                w.fetch_add(1, Ordering::Relaxed);
+            }
         });
         router.on("#", move |_, _, _| {
             let a = a.clone();
-            async move { a.fetch_add(1, Ordering::Relaxed); }
+            async move {
+                a.fetch_add(1, Ordering::Relaxed);
+            }
         });
 
         let store = test_store();
-        router
-            .dispatch("auth/login", Arc::new(()), store)
-            .await;
+        router.dispatch("auth/login", Arc::new(()), store).await;
 
         assert_eq!(exact.load(Ordering::Relaxed), 1);
         assert_eq!(wild.load(Ordering::Relaxed), 1);
@@ -417,11 +417,15 @@ mod tests {
 
         router.on("test", move |_, _, _| {
             let c = c1.clone();
-            async move { c.fetch_add(1, Ordering::Relaxed); }
+            async move {
+                c.fetch_add(1, Ordering::Relaxed);
+            }
         });
         router.on("test", move |_, _, _| {
             let c = c2.clone();
-            async move { c.fetch_add(1, Ordering::Relaxed); }
+            async move {
+                c.fetch_add(1, Ordering::Relaxed);
+            }
         });
 
         let store = test_store();

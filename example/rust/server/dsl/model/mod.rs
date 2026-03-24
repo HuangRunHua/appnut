@@ -3,14 +3,14 @@
 //! Each model is a single file with `#[model]` — the macro generates
 //! serde, Field consts, IR metadata, and common fields.
 
-pub mod user;
-pub mod tweet;
-pub mod like;
 pub mod follow;
+pub mod like;
 pub mod message;
+pub mod tweet;
+pub mod user;
 
-pub use user::User;
-pub use tweet::Tweet;
-pub use like::Like;
 pub use follow::Follow;
+pub use like::Like;
 pub use message::Message;
+pub use tweet::Tweet;
+pub use user::User;

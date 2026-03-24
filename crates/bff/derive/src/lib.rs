@@ -12,9 +12,9 @@
 use proc_macro::TokenStream;
 use syn::parse_macro_input;
 
-mod state;
-mod request;
 mod handlers;
+mod request;
+mod state;
 
 /// Define a Flux state type.
 ///

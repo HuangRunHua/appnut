@@ -4,7 +4,7 @@
 //! This module provides helpers to aggregate them into the full schema
 //! served at `/meta/schema`.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::hierarchy::HierarchyNode;
 
@@ -65,12 +65,21 @@ impl ResourceDef {
         let path = openerp_types::pluralize(&name);
         let icon = default_icon(&name);
         let permissions = Self::crud_permissions(module, &name);
-        Self { name, label, path, icon, description: String::new(), ir, permissions }
+        Self {
+            name,
+            label,
+            path,
+            icon,
+            description: String::new(),
+            ir,
+            permissions,
+        }
     }
 
     /// Add custom action permissions.
     pub fn with_action(mut self, module: &str, action: &str) -> Self {
-        self.permissions.push(format!("{}:{}:{}", module, self.name, action));
+        self.permissions
+            .push(format!("{}:{}:{}", module, self.name, action));
         self
     }
 
@@ -95,7 +104,11 @@ fn action_description(action: &str, resource_label: &str) -> String {
         "update" => format!("Edit {}", resource_label.trim_end_matches('s')),
         "delete" => format!("Delete {}", resource_label.trim_end_matches('s')),
         "list" => format!("List all {}", resource_label),
-        other => format!("{} {}", capitalize(other), resource_label.trim_end_matches('s')),
+        other => format!(
+            "{} {}",
+            capitalize(other),
+            resource_label.trim_end_matches('s')
+        ),
     }
 }
 
@@ -122,7 +135,8 @@ fn default_icon(resource: &str) -> String {
         "license" => "key",
         "task" => "activity",
         _ => "file",
-    }.to_string()
+    }
+    .to_string()
 }
 
 /// Build the complete schema JSON from module definitions.
@@ -135,11 +149,15 @@ pub fn build_schema(app_name: &str, modules: Vec<ModuleDef>) -> Value {
             // Collect permissions per module with descriptions.
             let mut mod_perms = serde_json::Map::new();
             for r in &m.resources {
-                let actions: Vec<Value> = r.permissions.iter().map(|p| {
-                    let action = p.rsplit(':').next().unwrap_or(p);
-                    let desc = action_description(action, &r.label);
-                    json!({ "perm": p, "action": action, "desc": desc })
-                }).collect();
+                let actions: Vec<Value> = r
+                    .permissions
+                    .iter()
+                    .map(|p| {
+                        let action = p.rsplit(':').next().unwrap_or(p);
+                        let desc = action_description(action, &r.label);
+                        json!({ "perm": p, "action": action, "desc": desc })
+                    })
+                    .collect();
                 mod_perms.insert(
                     r.name.to_string(),
                     json!({
@@ -149,45 +167,55 @@ pub fn build_schema(app_name: &str, modules: Vec<ModuleDef>) -> Value {
                     }),
                 );
             }
-            all_permissions
-                .insert(m.id.to_string(), Value::Object(mod_perms));
+            all_permissions.insert(m.id.to_string(), Value::Object(mod_perms));
 
             // Build enum map: name → variants.
-            let enum_map: serde_json::Map<String, Value> = m.enums.iter().map(|e| {
-                (e.name.to_string(), json!(e.variants))
-            }).collect();
+            let enum_map: serde_json::Map<String, Value> = m
+                .enums
+                .iter()
+                .map(|e| (e.name.to_string(), json!(e.variants)))
+                .collect();
 
             // Build resource IRs with enum variants filled in.
-            let resource_irs: Vec<Value> = m.resources.iter().map(|r| {
-                // Clone the IR and fill in enum variants for this resource
-                let mut ir = r.ir.clone();
-                if let Some(fields) = ir["fields"].as_array() {
-                    let updated_fields: Vec<Value> = fields.iter().map(|f| {
-                        if f.get("isEnum").is_some() {
-                            let ty = f["ty"].as_str().unwrap_or("");
-                            // Extract inner type from Option<Inner> wrapper
-                            let inner_ty = if let Some(start) = ty.find("Option<") {
-                                if let Some(end) = ty.rfind(">") {
-                                    &ty[start + 7..end]
-                                } else {
-                                    ty
+            let resource_irs: Vec<Value> = m
+                .resources
+                .iter()
+                .map(|r| {
+                    // Clone the IR and fill in enum variants for this resource
+                    let mut ir = r.ir.clone();
+                    if let Some(fields) = ir["fields"].as_array() {
+                        let updated_fields: Vec<Value> = fields
+                            .iter()
+                            .map(|f| {
+                                if f.get("isEnum").is_some() {
+                                    let ty = f["ty"].as_str().unwrap_or("");
+                                    // Extract inner type from Option<Inner> wrapper
+                                    let inner_ty = if let Some(start) = ty.find("Option<") {
+                                        if let Some(end) = ty.rfind(">") {
+                                            &ty[start + 7..end]
+                                        } else {
+                                            ty
+                                        }
+                                    } else {
+                                        ty
+                                    };
+                                    // Look up the enum in module's enum definitions
+                                    if let Some(enum_def) =
+                                        m.enums.iter().find(|e| e.name == inner_ty)
+                                    {
+                                        let mut updated = f.clone();
+                                        updated["variants"] = json!(enum_def.variants);
+                                        return updated;
+                                    }
                                 }
-                            } else {
-                                ty
-                            };
-                            // Look up the enum in module's enum definitions
-                            if let Some(enum_def) = m.enums.iter().find(|e| e.name == inner_ty) {
-                                let mut updated = f.clone();
-                                updated["variants"] = json!(enum_def.variants);
-                                return updated;
-                            }
-                        }
-                        f.clone()
-                    }).collect();
-                    ir["fields"] = json!(updated_fields);
-                }
-                ir
-            }).collect();
+                                f.clone()
+                            })
+                            .collect();
+                        ir["fields"] = json!(updated_fields);
+                    }
+                    ir
+                })
+                .collect();
 
             // Build module JSON.
             json!({
@@ -224,26 +252,45 @@ mod tests {
                 label: "Authentication",
                 icon: "shield",
                 resources: vec![
-                    ResourceDef::from_ir("auth", json!({"name": "User", "module": "auth", "resource": "user", "fields": []}))
-                        .with_desc("User identity management"),
+                    ResourceDef::from_ir(
+                        "auth",
+                        json!({"name": "User", "module": "auth", "resource": "user", "fields": []}),
+                    )
+                    .with_desc("User identity management"),
                 ],
                 enums: vec![],
-                hierarchy: vec![
-                    HierarchyNode::leaf("user", "Users", "users", "User identity management"),
-                ],
+                hierarchy: vec![HierarchyNode::leaf(
+                    "user",
+                    "Users",
+                    "users",
+                    "User identity management",
+                )],
             }],
         );
 
         assert_eq!(schema["name"], "TestApp");
         assert_eq!(schema["modules"][0]["id"], "auth");
-        assert_eq!(schema["modules"][0]["hierarchy"]["nav"][0]["label"], "Users");
-        assert!(schema["modules"][0]["enums"].as_object().unwrap().is_empty());
+        assert_eq!(
+            schema["modules"][0]["hierarchy"]["nav"][0]["label"],
+            "Users"
+        );
+        assert!(
+            schema["modules"][0]["enums"]
+                .as_object()
+                .unwrap()
+                .is_empty()
+        );
 
         let user_perms = &schema["permissions"]["auth"]["user"];
         assert_eq!(user_perms["description"], "User identity management");
         assert_eq!(user_perms["actions"].as_array().unwrap().len(), 5);
         assert_eq!(user_perms["actions"][0]["action"], "create");
-        assert!(user_perms["actions"][0]["desc"].as_str().unwrap().contains("User"));
+        assert!(
+            user_perms["actions"][0]["desc"]
+                .as_str()
+                .unwrap()
+                .contains("User")
+        );
     }
 
     #[test]
@@ -255,15 +302,19 @@ mod tests {
                 label: "PMS",
                 icon: "box",
                 resources: vec![],
-                enums: vec![
-                    EnumDef { name: "BatchStatus", variants: &["DRAFT", "IN_PROGRESS", "COMPLETED", "CANCELLED"] },
-                ],
+                enums: vec![EnumDef {
+                    name: "BatchStatus",
+                    variants: &["DRAFT", "IN_PROGRESS", "COMPLETED", "CANCELLED"],
+                }],
                 hierarchy: vec![],
             }],
         );
 
         let enums = &schema["modules"][0]["enums"];
-        assert_eq!(enums["BatchStatus"], json!(["DRAFT", "IN_PROGRESS", "COMPLETED", "CANCELLED"]));
+        assert_eq!(
+            enums["BatchStatus"],
+            json!(["DRAFT", "IN_PROGRESS", "COMPLETED", "CANCELLED"])
+        );
     }
 
     #[test]
@@ -276,7 +327,9 @@ mod tests {
         assert_eq!(def.icon, "monitor");
         assert_eq!(def.permissions.len(), 5);
 
-        let def = def.with_action("pms", "provision").with_action("pms", "activate");
+        let def = def
+            .with_action("pms", "provision")
+            .with_action("pms", "activate");
         assert_eq!(def.permissions.len(), 7);
     }
 }

@@ -14,8 +14,7 @@ pub struct SqliteStore {
 impl SqliteStore {
     /// Open or create a SQLite database at the given path.
     pub fn open(path: &Path) -> Result<Self, SQLError> {
-        let conn = Connection::open(path)
-            .map_err(|e| SQLError::Connection(e.to_string()))?;
+        let conn = Connection::open(path).map_err(|e| SQLError::Connection(e.to_string()))?;
 
         // Enable WAL mode for better concurrent read performance.
         conn.execute_batch("PRAGMA journal_mode=WAL;")
@@ -28,8 +27,7 @@ impl SqliteStore {
 
     /// Create an in-memory SQLite database (useful for tests).
     pub fn open_in_memory() -> Result<Self, SQLError> {
-        let conn = Connection::open_in_memory()
-            .map_err(|e| SQLError::Connection(e.to_string()))?;
+        let conn = Connection::open_in_memory().map_err(|e| SQLError::Connection(e.to_string()))?;
         Ok(Self {
             conn: Mutex::new(conn),
         })
@@ -67,11 +65,7 @@ impl SQLStore for SqliteStore {
             .prepare(sql)
             .map_err(|e| SQLError::Query(e.to_string()))?;
 
-        let column_names: Vec<String> = stmt
-            .column_names()
-            .iter()
-            .map(|s| s.to_string())
-            .collect();
+        let column_names: Vec<String> = stmt.column_names().iter().map(|s| s.to_string()).collect();
 
         let rows = stmt
             .query_map(param_refs.as_slice(), |row| {

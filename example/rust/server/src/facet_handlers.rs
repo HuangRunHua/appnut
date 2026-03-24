@@ -6,9 +6,9 @@
 
 use std::sync::Arc;
 
+use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::HeaderMap;
-use axum::Json;
 
 use openerp_core::ServiceError;
 use openerp_store::{FacetResponse, KvOps};
@@ -43,14 +43,12 @@ fn current_user(headers: &HeaderMap, state: &FacetStateInner) -> Result<String, 
         .get("authorization")
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.strip_prefix("Bearer "))
-        .ok_or_else(|| ServiceError::Unauthorized(
-            state.i18n.t("error.auth.missing_token", &[])
-        ))?;
+        .ok_or_else(|| ServiceError::Unauthorized(state.i18n.t("error.auth.missing_token", &[])))?;
 
-    let claims = state.jwt.verify(token)
-        .map_err(|_e| ServiceError::Unauthorized(
-            state.i18n.t("error.auth.invalid_token", &[])
-        ))?;
+    let claims = state
+        .jwt
+        .verify(token)
+        .map_err(|_e| ServiceError::Unauthorized(state.i18n.t("error.auth.invalid_token", &[])))?;
 
     Ok(claims.sub)
 }
@@ -65,9 +63,14 @@ fn to_app_tweet(t: &Tweet, uid: &str, state: &FacetStateInner) -> AppTweet {
     AppTweet {
         id: t.id.to_string(),
         author_id: author_id.to_string(),
-        author_username: author.as_ref().map(|u| u.username.clone()).unwrap_or_default(),
+        author_username: author
+            .as_ref()
+            .map(|u| u.username.clone())
+            .unwrap_or_default(),
         author_display_name: author.as_ref().and_then(|u| u.display_name.clone()),
-        author_avatar: author.as_ref().and_then(|u| u.avatar.as_ref().map(|a| a.to_string())),
+        author_avatar: author
+            .as_ref()
+            .and_then(|u| u.avatar.as_ref().map(|a| a.to_string())),
         content: t.content.clone(),
         image_url: t.image_url.as_ref().map(|u| u.to_string()),
         like_count: t.like_count,
@@ -129,22 +132,30 @@ pub async fn login(
     State(state): State<FacetState>,
     Json(req): Json<LoginRequest>,
 ) -> Result<Json<LoginResponse>, ServiceError> {
-    let user = state.users.get(&req.username)
+    let user = state
+        .users
+        .get(&req.username)
         .map_err(|e| ServiceError::Internal(e.to_string()))?
-        .ok_or_else(|| ServiceError::Unauthorized(
-            state.i18n.t("error.auth.user_not_found", &[("username", &req.username)])
-        ))?;
+        .ok_or_else(|| {
+            ServiceError::Unauthorized(
+                state
+                    .i18n
+                    .t("error.auth.user_not_found", &[("username", &req.username)]),
+            )
+        })?;
 
     if let Some(ref stored_hash) = user.password_hash {
         if !verify_password(&req.password, stored_hash.as_str()) {
             return Err(ServiceError::Unauthorized(
-                state.i18n.t("error.auth.invalid_token", &[])
+                state.i18n.t("error.auth.invalid_token", &[]),
             ));
         }
     }
 
     let display = user.display_name.as_deref().unwrap_or(&user.username);
-    let token = state.jwt.issue(user.id.as_str(), display)
+    let token = state
+        .jwt
+        .issue(user.id.as_str(), display)
         .map_err(|e| ServiceError::Internal(e))?;
 
     Ok(Json(LoginResponse {
@@ -161,9 +172,13 @@ pub async fn get_me(
     State(state): State<FacetState>,
 ) -> Result<FacetResponse<AppUser>, ServiceError> {
     let uid = current_user(&headers, &state)?;
-    let user = state.users.get(&uid)
+    let user = state
+        .users
+        .get(&uid)
         .map_err(|e| ServiceError::Internal(e.to_string()))?
-        .ok_or_else(|| ServiceError::NotFound(state.i18n.t("error.profile.not_found", &[("id", &uid)])))?;
+        .ok_or_else(|| {
+            ServiceError::NotFound(state.i18n.t("error.profile.not_found", &[("id", &uid)]))
+        })?;
     Ok(FacetResponse::negotiate(to_app_user(&user), &headers))
 }
 
@@ -174,9 +189,13 @@ pub async fn get_timeline(
     Json(params): Json<PaginationParams>,
 ) -> Result<Json<TimelineResponse>, ServiceError> {
     let uid = current_user(&headers, &state)?;
-    let mut tweets = state.tweets.list().map_err(|e| ServiceError::Internal(e.to_string()))?;
+    let mut tweets = state
+        .tweets
+        .list()
+        .map_err(|e| ServiceError::Internal(e.to_string()))?;
     tweets.sort_by(|a, b| b.created_at.as_str().cmp(a.created_at.as_str()));
-    let all_items: Vec<AppTweet> = tweets.iter()
+    let all_items: Vec<AppTweet> = tweets
+        .iter()
         .filter(|t| t.reply_to.is_none())
         .map(|t| to_app_tweet(t, &uid, &state))
         .collect();
@@ -196,21 +215,35 @@ pub async fn create_tweet(
 ) -> Result<FacetResponse<AppTweet>, ServiceError> {
     let uid = current_user(&headers, &state)?;
     if req.content.trim().is_empty() {
-        return Err(ServiceError::Validation(state.i18n.t("error.tweet.empty", &[])));
+        return Err(ServiceError::Validation(
+            state.i18n.t("error.tweet.empty", &[]),
+        ));
     }
     if req.content.len() > 280 {
-        return Err(ServiceError::Validation(state.i18n.t("error.tweet.too_long", &[("max", "280")])));
+        return Err(ServiceError::Validation(
+            state.i18n.t("error.tweet.too_long", &[("max", "280")]),
+        ));
     }
     let tweet = Tweet {
         id: Id::default(),
         author: Name::new(&format!("twitter/users/{}", uid)),
         content: req.content,
         image_url: None,
-        like_count: 0, reply_count: 0,
-        reply_to: req.reply_to_id.map(|s| Name::new(&format!("twitter/tweets/{}", s))),
-        display_name: None, description: None, metadata: None, created_at: DateTime::default(), updated_at: DateTime::default(),
+        like_count: 0,
+        reply_count: 0,
+        reply_to: req
+            .reply_to_id
+            .map(|s| Name::new(&format!("twitter/tweets/{}", s))),
+        display_name: None,
+        description: None,
+        metadata: None,
+        created_at: DateTime::default(),
+        updated_at: DateTime::default(),
     };
-    let created = state.tweets.save_new(tweet).map_err(|e| ServiceError::Internal(e.to_string()))?;
+    let created = state
+        .tweets
+        .save_new(tweet)
+        .map_err(|e| ServiceError::Internal(e.to_string()))?;
     if let Ok(Some(mut user)) = state.users.get(&uid) {
         user.tweet_count += 1;
         let _ = state.users.save(user);
@@ -221,7 +254,10 @@ pub async fn create_tweet(
             let _ = state.tweets.save(parent);
         }
     }
-    Ok(FacetResponse::negotiate(to_app_tweet(&created, &uid, &state), &headers))
+    Ok(FacetResponse::negotiate(
+        to_app_tweet(&created, &uid, &state),
+        &headers,
+    ))
 }
 
 /// POST /tweets/{id}/detail
@@ -231,17 +267,25 @@ pub async fn tweet_detail(
     Path(id): Path<String>,
 ) -> Result<Json<TweetDetailResponse>, ServiceError> {
     let uid = current_user(&headers, &state)?;
-    let tweet = state.tweets.get(&id)
+    let tweet = state
+        .tweets
+        .get(&id)
         .map_err(|e| ServiceError::Internal(e.to_string()))?
-        .ok_or_else(|| ServiceError::NotFound(state.i18n.t("error.tweet.not_found", &[("id", &id)])))?;
+        .ok_or_else(|| {
+            ServiceError::NotFound(state.i18n.t("error.tweet.not_found", &[("id", &id)]))
+        })?;
     let item = to_app_tweet(&tweet, &uid, &state);
     let all = state.tweets.list().unwrap_or_default();
-    let mut replies: Vec<AppTweet> = all.iter()
+    let mut replies: Vec<AppTweet> = all
+        .iter()
         .filter(|t| t.reply_to.as_ref().map(|n| n.resource_id()) == Some(&id))
         .map(|t| to_app_tweet(t, &uid, &state))
         .collect();
     replies.sort_by(|a, b| a.created_at.cmp(&b.created_at));
-    Ok(Json(TweetDetailResponse { tweet: item, replies }))
+    Ok(Json(TweetDetailResponse {
+        tweet: item,
+        replies,
+    }))
 }
 
 /// POST /tweets/{id}/like
@@ -255,16 +299,30 @@ pub async fn like_tweet(
         id: Id::default(),
         user: Name::new(&format!("twitter/users/{}", uid)),
         tweet: Name::new(&format!("twitter/tweets/{}", id)),
-        display_name: None, description: None, metadata: None, created_at: DateTime::default(), updated_at: DateTime::default(),
+        display_name: None,
+        description: None,
+        metadata: None,
+        created_at: DateTime::default(),
+        updated_at: DateTime::default(),
     };
     let _ = state.likes.save_new(like);
-    let mut tweet = state.tweets.get(&id)
+    let mut tweet = state
+        .tweets
+        .get(&id)
         .map_err(|e| ServiceError::Internal(e.to_string()))?
-        .ok_or_else(|| ServiceError::NotFound(state.i18n.t("error.tweet.not_found", &[("id", &id)])))?;
+        .ok_or_else(|| {
+            ServiceError::NotFound(state.i18n.t("error.tweet.not_found", &[("id", &id)]))
+        })?;
     let all_likes = state.likes.list().unwrap_or_default();
-    tweet.like_count = all_likes.iter().filter(|l| l.tweet.resource_id() == id).count() as u32;
+    tweet.like_count = all_likes
+        .iter()
+        .filter(|l| l.tweet.resource_id() == id)
+        .count() as u32;
     let _ = state.tweets.save(tweet.clone());
-    Ok(FacetResponse::negotiate(to_app_tweet(&tweet, &uid, &state), &headers))
+    Ok(FacetResponse::negotiate(
+        to_app_tweet(&tweet, &uid, &state),
+        &headers,
+    ))
 }
 
 /// DELETE /tweets/{id}/like
@@ -278,7 +336,10 @@ pub async fn unlike_tweet(
     let _ = state.likes.delete(&like_key);
     if let Ok(Some(mut tweet)) = state.tweets.get(&id) {
         let all_likes = state.likes.list().unwrap_or_default();
-        tweet.like_count = all_likes.iter().filter(|l| l.tweet.resource_id() == id).count() as u32;
+        tweet.like_count = all_likes
+            .iter()
+            .filter(|l| l.tweet.resource_id() == id)
+            .count() as u32;
         let _ = state.tweets.save(tweet);
     }
     Ok(())
@@ -295,7 +356,11 @@ pub async fn follow_user(
         id: Id::default(),
         follower: Name::new(&format!("twitter/users/{}", uid)),
         followee: Name::new(&format!("twitter/users/{}", id)),
-        display_name: None, description: None, metadata: None, created_at: DateTime::default(), updated_at: DateTime::default(),
+        display_name: None,
+        description: None,
+        metadata: None,
+        created_at: DateTime::default(),
+        updated_at: DateTime::default(),
     };
     if state.follows.save_new(follow).is_ok() {
         if let Ok(Some(mut me)) = state.users.get(&uid) {
@@ -307,10 +372,17 @@ pub async fn follow_user(
             let _ = state.users.save(them);
         }
     }
-    let user = state.users.get(&id)
+    let user = state
+        .users
+        .get(&id)
         .map_err(|e| ServiceError::Internal(e.to_string()))?
-        .ok_or_else(|| ServiceError::NotFound(state.i18n.t("error.profile.not_found", &[("id", &id)])))?;
-    Ok(FacetResponse::negotiate(to_app_profile(&user, &uid, &state), &headers))
+        .ok_or_else(|| {
+            ServiceError::NotFound(state.i18n.t("error.profile.not_found", &[("id", &id)]))
+        })?;
+    Ok(FacetResponse::negotiate(
+        to_app_profile(&user, &uid, &state),
+        &headers,
+    ))
 }
 
 /// DELETE /users/{id}/follow
@@ -341,16 +413,24 @@ pub async fn user_profile(
     Path(id): Path<String>,
 ) -> Result<Json<UserProfileResponse>, ServiceError> {
     let uid = current_user(&headers, &state)?;
-    let user = state.users.get(&id)
+    let user = state
+        .users
+        .get(&id)
         .map_err(|e| ServiceError::Internal(e.to_string()))?
-        .ok_or_else(|| ServiceError::NotFound(state.i18n.t("error.profile.not_found", &[("id", &id)])))?;
+        .ok_or_else(|| {
+            ServiceError::NotFound(state.i18n.t("error.profile.not_found", &[("id", &id)]))
+        })?;
     let profile = to_app_profile(&user, &uid, &state);
     let all = state.tweets.list().unwrap_or_default();
-    let tweets: Vec<AppTweet> = all.iter()
+    let tweets: Vec<AppTweet> = all
+        .iter()
         .filter(|t| t.author.resource_id() == id)
         .map(|t| to_app_tweet(t, &uid, &state))
         .collect();
-    Ok(Json(UserProfileResponse { user: profile, tweets }))
+    Ok(Json(UserProfileResponse {
+        user: profile,
+        tweets,
+    }))
 }
 
 /// PUT /me/profile — with optimistic locking via updatedAt.
@@ -361,11 +441,17 @@ pub async fn update_profile(
 ) -> Result<FacetResponse<AppUser>, ServiceError> {
     let uid = current_user(&headers, &state)?;
     if req.display_name.trim().is_empty() {
-        return Err(ServiceError::Validation(state.i18n.t("error.profile.name_empty", &[])));
+        return Err(ServiceError::Validation(
+            state.i18n.t("error.profile.name_empty", &[]),
+        ));
     }
-    let mut user = state.users.get(&uid)
+    let mut user = state
+        .users
+        .get(&uid)
         .map_err(|e| ServiceError::Internal(e.to_string()))?
-        .ok_or_else(|| ServiceError::NotFound(state.i18n.t("error.profile.not_found", &[("id", &uid)])))?;
+        .ok_or_else(|| {
+            ServiceError::NotFound(state.i18n.t("error.profile.not_found", &[("id", &uid)]))
+        })?;
 
     // Optimistic locking: if client sends updatedAt, compare with stored value.
     if let Some(ref client_ts) = req.updated_at {
@@ -387,7 +473,9 @@ pub async fn update_profile(
         ServiceError::Internal(e.to_string())
     })?;
     // Re-fetch to get the new updatedAt stamp.
-    let updated = state.users.get(&uid)
+    let updated = state
+        .users
+        .get(&uid)
         .map_err(|e| ServiceError::Internal(e.to_string()))?
         .unwrap_or(user);
     Ok(FacetResponse::negotiate(to_app_user(&updated), &headers))
@@ -400,7 +488,9 @@ pub async fn change_password(
     Json(req): Json<ChangePasswordRequest>,
 ) -> Result<Json<ChangePasswordResponse>, ServiceError> {
     let uid = current_user(&headers, &state)?;
-    let mut user = state.users.get(&uid)
+    let mut user = state
+        .users
+        .get(&uid)
         .map_err(|e| ServiceError::Internal(e.to_string()))?
         .ok_or_else(|| ServiceError::NotFound("user not found".into()))?;
 
@@ -410,14 +500,21 @@ pub async fn change_password(
         }
     }
     if req.new_password.len() < 6 {
-        return Err(ServiceError::Validation("password must be at least 6 characters".into()));
+        return Err(ServiceError::Validation(
+            "password must be at least 6 characters".into(),
+        ));
     }
     if req.old_password == req.new_password {
-        return Err(ServiceError::Validation("new password must be different".into()));
+        return Err(ServiceError::Validation(
+            "new password must be different".into(),
+        ));
     }
 
     user.password_hash = Some(PasswordHash::new(&hash_password(&req.new_password)));
-    state.users.save(user).map_err(|e| ServiceError::Internal(e.to_string()))?;
+    state
+        .users
+        .save(user)
+        .map_err(|e| ServiceError::Internal(e.to_string()))?;
     Ok(Json(ChangePasswordResponse { ok: true }))
 }
 
@@ -429,12 +526,26 @@ pub async fn search(
 ) -> Result<Json<SearchResponse>, ServiceError> {
     let uid = current_user(&headers, &state)?;
     let q = req.query.to_lowercase();
-    let users: Vec<AppProfile> = state.users.list().unwrap_or_default().iter()
-        .filter(|u| u.username.to_lowercase().contains(&q)
-            || u.display_name.as_deref().unwrap_or("").to_lowercase().contains(&q))
+    let users: Vec<AppProfile> = state
+        .users
+        .list()
+        .unwrap_or_default()
+        .iter()
+        .filter(|u| {
+            u.username.to_lowercase().contains(&q)
+                || u.display_name
+                    .as_deref()
+                    .unwrap_or("")
+                    .to_lowercase()
+                    .contains(&q)
+        })
         .map(|u| to_app_profile(u, &uid, &state))
         .collect();
-    let tweets: Vec<AppTweet> = state.tweets.list().unwrap_or_default().iter()
+    let tweets: Vec<AppTweet> = state
+        .tweets
+        .list()
+        .unwrap_or_default()
+        .iter()
         .filter(|t| t.content.to_lowercase().contains(&q))
         .map(|t| to_app_tweet(t, &uid, &state))
         .collect();
@@ -457,8 +568,14 @@ pub async fn upload_image(
         return Err(ServiceError::Validation("file exceeds 5MB limit".into()));
     }
 
-    let key = format!("uploads/{}/{}.jpg", uid, uuid::Uuid::new_v4().to_string().replace('-', ""));
-    state.blobs.put(&key, &body)
+    let key = format!(
+        "uploads/{}/{}.jpg",
+        uid,
+        uuid::Uuid::new_v4().to_string().replace('-', "")
+    );
+    state
+        .blobs
+        .put(&key, &body)
         .map_err(|e| ServiceError::Internal(e.to_string()))?;
 
     let url = format!("{}/blobs/{}", state.blob_base_url, key);
@@ -471,7 +588,8 @@ pub async fn upload_image(
 // ── Inbox (站内信) ──
 
 fn lang_from_headers(headers: &HeaderMap) -> String {
-    headers.get("accept-language")
+    headers
+        .get("accept-language")
         .and_then(|v| v.to_str().ok())
         .unwrap_or("en")
         .split(',')
@@ -499,10 +617,13 @@ pub async fn get_inbox(
 ) -> Result<Json<InboxResponse>, ServiceError> {
     let uid = current_user(&headers, &state)?;
     let lang = lang_from_headers(&headers);
-    let all = state.messages.list()
+    let all = state
+        .messages
+        .list()
         .map_err(|e| ServiceError::Internal(e.to_string()))?;
 
-    let msgs: Vec<AppMessage> = all.iter()
+    let msgs: Vec<AppMessage> = all
+        .iter()
         .filter(|m| {
             m.recipient.as_ref().map(|n| n.resource_id()) == Some(uid.as_str())
                 || m.recipient.is_none()
@@ -511,7 +632,10 @@ pub async fn get_inbox(
         .collect();
 
     let unread = msgs.iter().filter(|m| !m.read).count();
-    Ok(Json(InboxResponse { messages: msgs, unread_count: unread }))
+    Ok(Json(InboxResponse {
+        messages: msgs,
+        unread_count: unread,
+    }))
 }
 
 /// POST /messages/{id}/read — mark message as read.
@@ -522,12 +646,16 @@ pub async fn mark_read(
 ) -> Result<Json<AppMessage>, ServiceError> {
     let _uid = current_user(&headers, &state)?;
     let lang = lang_from_headers(&headers);
-    let mut msg = state.messages.get(&id)
+    let mut msg = state
+        .messages
+        .get(&id)
         .map_err(|e| ServiceError::Internal(e.to_string()))?
         .ok_or_else(|| ServiceError::NotFound("Message not found".into()))?;
 
     msg.read = true;
-    state.messages.save(msg.clone())
+    state
+        .messages
+        .save(msg.clone())
         .map_err(|e| ServiceError::Internal(e.to_string()))?;
 
     Ok(Json(to_app_message(&msg, &lang)))
@@ -564,7 +692,10 @@ pub fn facet_router(state: FacetState) -> axum::Router {
         .route("/tweets", post(create_tweet))
         .route("/tweets/{id}/detail", post(tweet_detail))
         .route("/tweets/{id}/like", post(like_tweet).delete(unlike_tweet))
-        .route("/users/{id}/follow", post(follow_user).delete(unfollow_user))
+        .route(
+            "/users/{id}/follow",
+            post(follow_user).delete(unfollow_user),
+        )
         .route("/users/{id}/profile", post(user_profile))
         .route("/search", post(search))
         .route("/upload", post(upload_image))
@@ -584,35 +715,51 @@ mod tests {
 
     fn setup() -> (axum::Router, JwtService) {
         let dir = tempfile::tempdir().unwrap();
-        let kv: Arc<dyn openerp_kv::KVStore> = Arc::new(
-            openerp_kv::RedbStore::open(&dir.path().join("test.redb")).unwrap(),
-        );
+        let kv: Arc<dyn openerp_kv::KVStore> =
+            Arc::new(openerp_kv::RedbStore::open(&dir.path().join("test.redb")).unwrap());
         let jwt = JwtService::golden_test();
 
         // Seed users.
         let users = KvOps::<User>::new(kv.clone());
-        users.save_new(User {
-            id: Id::default(), username: "alice".into(),
-            password_hash: Some(PasswordHash::new(&hash_password("password"))),
-            bio: Some("Rust dev".into()), avatar: None,
-            follower_count: 0, following_count: 0, tweet_count: 0,
-            display_name: Some("Alice".into()),
-            description: None, metadata: None, created_at: DateTime::default(), updated_at: DateTime::default(),
-        }).unwrap();
-        users.save_new(User {
-            id: Id::default(), username: "bob".into(),
-            password_hash: Some(PasswordHash::new(&hash_password("password"))),
-            bio: None, avatar: None,
-            follower_count: 0, following_count: 0, tweet_count: 0,
-            display_name: Some("Bob".into()),
-            description: None, metadata: None, created_at: DateTime::default(), updated_at: DateTime::default(),
-        }).unwrap();
+        users
+            .save_new(User {
+                id: Id::default(),
+                username: "alice".into(),
+                password_hash: Some(PasswordHash::new(&hash_password("password"))),
+                bio: Some("Rust dev".into()),
+                avatar: None,
+                follower_count: 0,
+                following_count: 0,
+                tweet_count: 0,
+                display_name: Some("Alice".into()),
+                description: None,
+                metadata: None,
+                created_at: DateTime::default(),
+                updated_at: DateTime::default(),
+            })
+            .unwrap();
+        users
+            .save_new(User {
+                id: Id::default(),
+                username: "bob".into(),
+                password_hash: Some(PasswordHash::new(&hash_password("password"))),
+                bio: None,
+                avatar: None,
+                follower_count: 0,
+                following_count: 0,
+                tweet_count: 0,
+                display_name: Some("Bob".into()),
+                description: None,
+                metadata: None,
+                created_at: DateTime::default(),
+                updated_at: DateTime::default(),
+            })
+            .unwrap();
 
         let blob_dir = dir.path().join("blobs");
         std::fs::create_dir_all(&blob_dir).unwrap();
-        let blobs: Arc<dyn openerp_blob::BlobStore> = Arc::new(
-            openerp_blob::FileStore::open(&blob_dir).unwrap(),
-        );
+        let blobs: Arc<dyn openerp_blob::BlobStore> =
+            Arc::new(openerp_blob::FileStore::open(&blob_dir).unwrap());
         let state = Arc::new(FacetStateInner {
             users: KvOps::new(kv.clone()),
             tweets: KvOps::new(kv.clone()),
@@ -651,7 +798,9 @@ mod tests {
         let req = builder.body(body).unwrap();
         let resp = router.clone().oneshot(req).await.unwrap();
         let status = resp.status();
-        let bytes = axum::body::to_bytes(resp.into_body(), 1024 * 1024).await.unwrap();
+        let bytes = axum::body::to_bytes(resp.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
         let json = if bytes.is_empty() {
             serde_json::json!(null)
         } else {
@@ -665,8 +814,14 @@ mod tests {
     #[tokio::test]
     async fn login_success() {
         let (r, _) = setup();
-        let (s, body) = call(&r, "POST", "/auth/login", None,
-            Some(serde_json::json!({"username": "alice", "password": "password"}))).await;
+        let (s, body) = call(
+            &r,
+            "POST",
+            "/auth/login",
+            None,
+            Some(serde_json::json!({"username": "alice", "password": "password"})),
+        )
+        .await;
         assert_eq!(s, StatusCode::OK);
         assert!(body["accessToken"].as_str().unwrap().contains('.'));
         assert_eq!(body["user"]["username"], "alice");
@@ -675,8 +830,14 @@ mod tests {
     #[tokio::test]
     async fn login_unknown_user() {
         let (r, _) = setup();
-        let (s, body) = call(&r, "POST", "/auth/login", None,
-            Some(serde_json::json!({"username": "nobody", "password": "password"}))).await;
+        let (s, body) = call(
+            &r,
+            "POST",
+            "/auth/login",
+            None,
+            Some(serde_json::json!({"username": "nobody", "password": "password"})),
+        )
+        .await;
         assert_eq!(s, StatusCode::UNAUTHORIZED);
         assert_eq!(body["code"], "UNAUTHENTICATED");
     }
@@ -684,8 +845,14 @@ mod tests {
     #[tokio::test]
     async fn login_wrong_password() {
         let (r, _) = setup();
-        let (s, body) = call(&r, "POST", "/auth/login", None,
-            Some(serde_json::json!({"username": "alice", "password": "wrong"}))).await;
+        let (s, body) = call(
+            &r,
+            "POST",
+            "/auth/login",
+            None,
+            Some(serde_json::json!({"username": "alice", "password": "wrong"})),
+        )
+        .await;
         assert_eq!(s, StatusCode::UNAUTHORIZED);
         assert_eq!(body["code"], "UNAUTHENTICATED");
     }
@@ -734,7 +901,14 @@ mod tests {
     async fn empty_timeline() {
         let (r, jwt) = setup();
         let token = jwt.issue("alice", "Alice").unwrap();
-        let (s, body) = call(&r, "POST", "/timeline", Some(&token), Some(serde_json::json!({}))).await;
+        let (s, body) = call(
+            &r,
+            "POST",
+            "/timeline",
+            Some(&token),
+            Some(serde_json::json!({})),
+        )
+        .await;
         assert_eq!(s, StatusCode::OK);
         assert_eq!(body["items"].as_array().unwrap().len(), 0);
     }
@@ -747,14 +921,27 @@ mod tests {
         let token = jwt.issue("alice", "Alice").unwrap();
 
         // Create.
-        let (s, tweet) = call(&r, "POST", "/tweets", Some(&token),
-            Some(serde_json::json!({"content": "Hello!"}))).await;
+        let (s, tweet) = call(
+            &r,
+            "POST",
+            "/tweets",
+            Some(&token),
+            Some(serde_json::json!({"content": "Hello!"})),
+        )
+        .await;
         assert_eq!(s, StatusCode::OK);
         assert_eq!(tweet["content"], "Hello!");
         assert_eq!(tweet["authorUsername"], "alice");
 
         // Timeline.
-        let (s, tl) = call(&r, "POST", "/timeline", Some(&token), Some(serde_json::json!({}))).await;
+        let (s, tl) = call(
+            &r,
+            "POST",
+            "/timeline",
+            Some(&token),
+            Some(serde_json::json!({})),
+        )
+        .await;
         assert_eq!(s, StatusCode::OK);
         assert_eq!(tl["items"].as_array().unwrap().len(), 1);
     }
@@ -763,8 +950,14 @@ mod tests {
     async fn create_empty_tweet_rejected() {
         let (r, jwt) = setup();
         let token = jwt.issue("alice", "Alice").unwrap();
-        let (s, body) = call(&r, "POST", "/tweets", Some(&token),
-            Some(serde_json::json!({"content": "  "}))).await;
+        let (s, body) = call(
+            &r,
+            "POST",
+            "/tweets",
+            Some(&token),
+            Some(serde_json::json!({"content": "  "})),
+        )
+        .await;
         assert_eq!(s, StatusCode::BAD_REQUEST);
         assert_eq!(body["code"], "VALIDATION_FAILED");
     }
@@ -774,8 +967,14 @@ mod tests {
         let (r, jwt) = setup();
         let token = jwt.issue("alice", "Alice").unwrap();
         let long = "x".repeat(281);
-        let (s, body) = call(&r, "POST", "/tweets", Some(&token),
-            Some(serde_json::json!({"content": long}))).await;
+        let (s, body) = call(
+            &r,
+            "POST",
+            "/tweets",
+            Some(&token),
+            Some(serde_json::json!({"content": long})),
+        )
+        .await;
         assert_eq!(s, StatusCode::BAD_REQUEST);
         assert_eq!(body["code"], "VALIDATION_FAILED");
     }
@@ -788,22 +987,49 @@ mod tests {
         let token = jwt.issue("alice", "Alice").unwrap();
 
         // Create tweet.
-        let (_, tweet) = call(&r, "POST", "/tweets", Some(&token),
-            Some(serde_json::json!({"content": "Likeable"}))).await;
+        let (_, tweet) = call(
+            &r,
+            "POST",
+            "/tweets",
+            Some(&token),
+            Some(serde_json::json!({"content": "Likeable"})),
+        )
+        .await;
         let id = tweet["id"].as_str().unwrap();
 
         // Like.
-        let (s, liked) = call(&r, "POST", &format!("/tweets/{}/like", id), Some(&token), None).await;
+        let (s, liked) = call(
+            &r,
+            "POST",
+            &format!("/tweets/{}/like", id),
+            Some(&token),
+            None,
+        )
+        .await;
         assert_eq!(s, StatusCode::OK);
         assert_eq!(liked["likeCount"], 1);
         assert_eq!(liked["likedByMe"], true);
 
         // Unlike.
-        let (s, _) = call(&r, "DELETE", &format!("/tweets/{}/like", id), Some(&token), None).await;
+        let (s, _) = call(
+            &r,
+            "DELETE",
+            &format!("/tweets/{}/like", id),
+            Some(&token),
+            None,
+        )
+        .await;
         assert_eq!(s, StatusCode::OK);
 
         // Verify via detail.
-        let (_, detail) = call(&r, "POST", &format!("/tweets/{}/detail", id), Some(&token), None).await;
+        let (_, detail) = call(
+            &r,
+            "POST",
+            &format!("/tweets/{}/detail", id),
+            Some(&token),
+            None,
+        )
+        .await;
         assert_eq!(detail["tweet"]["likeCount"], 0);
         assert_eq!(detail["tweet"]["likedByMe"], false);
     }
@@ -858,8 +1084,14 @@ mod tests {
     async fn update_my_profile() {
         let (r, jwt) = setup();
         let token = jwt.issue("alice", "Alice").unwrap();
-        let (s, updated) = call(&r, "PUT", "/me/profile", Some(&token),
-            Some(serde_json::json!({"displayName": "Alice W", "bio": "New bio"}))).await;
+        let (s, updated) = call(
+            &r,
+            "PUT",
+            "/me/profile",
+            Some(&token),
+            Some(serde_json::json!({"displayName": "Alice W", "bio": "New bio"})),
+        )
+        .await;
         assert_eq!(s, StatusCode::OK);
         assert_eq!(updated["displayName"], "Alice W");
 
@@ -873,8 +1105,14 @@ mod tests {
     async fn update_empty_name_rejected() {
         let (r, jwt) = setup();
         let token = jwt.issue("alice", "Alice").unwrap();
-        let (s, body) = call(&r, "PUT", "/me/profile", Some(&token),
-            Some(serde_json::json!({"displayName": " ", "bio": ""}))).await;
+        let (s, body) = call(
+            &r,
+            "PUT",
+            "/me/profile",
+            Some(&token),
+            Some(serde_json::json!({"displayName": " ", "bio": ""})),
+        )
+        .await;
         assert_eq!(s, StatusCode::BAD_REQUEST);
         assert_eq!(body["code"], "VALIDATION_FAILED");
     }
@@ -887,18 +1125,37 @@ mod tests {
         let token = jwt.issue("alice", "Alice").unwrap();
 
         // Create parent.
-        let (_, parent) = call(&r, "POST", "/tweets", Some(&token),
-            Some(serde_json::json!({"content": "Parent"}))).await;
+        let (_, parent) = call(
+            &r,
+            "POST",
+            "/tweets",
+            Some(&token),
+            Some(serde_json::json!({"content": "Parent"})),
+        )
+        .await;
         let pid = parent["id"].as_str().unwrap();
 
         // Reply.
-        let (s, reply) = call(&r, "POST", "/tweets", Some(&token),
-            Some(serde_json::json!({"content": "Reply!", "replyToId": pid}))).await;
+        let (s, reply) = call(
+            &r,
+            "POST",
+            "/tweets",
+            Some(&token),
+            Some(serde_json::json!({"content": "Reply!", "replyToId": pid})),
+        )
+        .await;
         assert_eq!(s, StatusCode::OK);
         assert_eq!(reply["replyToId"], pid);
 
         // Parent reply count updated.
-        let (_, detail) = call(&r, "POST", &format!("/tweets/{}/detail", pid), Some(&token), None).await;
+        let (_, detail) = call(
+            &r,
+            "POST",
+            &format!("/tweets/{}/detail", pid),
+            Some(&token),
+            None,
+        )
+        .await;
         assert_eq!(detail["tweet"]["replyCount"], 1);
         assert_eq!(detail["replies"].as_array().unwrap().len(), 1);
     }
@@ -911,17 +1168,35 @@ mod tests {
         let token = jwt.issue("alice", "Alice").unwrap();
 
         // Create a tweet.
-        call(&r, "POST", "/tweets", Some(&token),
-            Some(serde_json::json!({"content": "Rust is great"}))).await;
+        call(
+            &r,
+            "POST",
+            "/tweets",
+            Some(&token),
+            Some(serde_json::json!({"content": "Rust is great"})),
+        )
+        .await;
 
         // Search.
-        let (s, resp) = call(&r, "POST", "/search", Some(&token),
-            Some(serde_json::json!({"query": "alice"}))).await;
+        let (s, resp) = call(
+            &r,
+            "POST",
+            "/search",
+            Some(&token),
+            Some(serde_json::json!({"query": "alice"})),
+        )
+        .await;
         assert_eq!(s, StatusCode::OK);
         assert!(!resp["users"].as_array().unwrap().is_empty());
 
-        let (_, resp) = call(&r, "POST", "/search", Some(&token),
-            Some(serde_json::json!({"query": "rust"}))).await;
+        let (_, resp) = call(
+            &r,
+            "POST",
+            "/search",
+            Some(&token),
+            Some(serde_json::json!({"query": "rust"})),
+        )
+        .await;
         assert!(!resp["tweets"].as_array().unwrap().is_empty());
     }
 
@@ -934,22 +1209,56 @@ mod tests {
         let bob_token = jwt.issue("bob", "Bob").unwrap();
 
         // Alice creates tweet.
-        let (_, tweet) = call(&r, "POST", "/tweets", Some(&alice_token),
-            Some(serde_json::json!({"content": "Like me"}))).await;
+        let (_, tweet) = call(
+            &r,
+            "POST",
+            "/tweets",
+            Some(&alice_token),
+            Some(serde_json::json!({"content": "Like me"})),
+        )
+        .await;
         let id = tweet["id"].as_str().unwrap();
 
         // Alice likes.
-        call(&r, "POST", &format!("/tweets/{}/like", id), Some(&alice_token), None).await;
+        call(
+            &r,
+            "POST",
+            &format!("/tweets/{}/like", id),
+            Some(&alice_token),
+            None,
+        )
+        .await;
         // Bob likes.
-        call(&r, "POST", &format!("/tweets/{}/like", id), Some(&bob_token), None).await;
+        call(
+            &r,
+            "POST",
+            &format!("/tweets/{}/like", id),
+            Some(&bob_token),
+            None,
+        )
+        .await;
 
         // Verify count = 2.
-        let (_, detail) = call(&r, "POST", &format!("/tweets/{}/detail", id), Some(&alice_token), None).await;
+        let (_, detail) = call(
+            &r,
+            "POST",
+            &format!("/tweets/{}/detail", id),
+            Some(&alice_token),
+            None,
+        )
+        .await;
         assert_eq!(detail["tweet"]["likeCount"], 2);
         assert_eq!(detail["tweet"]["likedByMe"], true); // Alice liked
 
         // Bob's view: also liked.
-        let (_, detail_bob) = call(&r, "POST", &format!("/tweets/{}/detail", id), Some(&bob_token), None).await;
+        let (_, detail_bob) = call(
+            &r,
+            "POST",
+            &format!("/tweets/{}/detail", id),
+            Some(&bob_token),
+            None,
+        )
+        .await;
         assert_eq!(detail_bob["tweet"]["likedByMe"], true);
     }
 
@@ -962,26 +1271,50 @@ mod tests {
 
         // Create 5 tweets.
         for i in 0..5 {
-            call(&r, "POST", "/tweets", Some(&token),
-                Some(serde_json::json!({"content": format!("Tweet {}", i)}))).await;
+            call(
+                &r,
+                "POST",
+                "/tweets",
+                Some(&token),
+                Some(serde_json::json!({"content": format!("Tweet {}", i)})),
+            )
+            .await;
         }
 
         // Page 1: limit=2, offset=0.
-        let (s, page1) = call(&r, "POST", "/timeline", Some(&token),
-            Some(serde_json::json!({"limit": 2, "offset": 0}))).await;
+        let (s, page1) = call(
+            &r,
+            "POST",
+            "/timeline",
+            Some(&token),
+            Some(serde_json::json!({"limit": 2, "offset": 0})),
+        )
+        .await;
         assert_eq!(s, StatusCode::OK);
         assert_eq!(page1["items"].as_array().unwrap().len(), 2);
         assert_eq!(page1["hasMore"], true);
 
         // Page 2: limit=2, offset=2.
-        let (_, page2) = call(&r, "POST", "/timeline", Some(&token),
-            Some(serde_json::json!({"limit": 2, "offset": 2}))).await;
+        let (_, page2) = call(
+            &r,
+            "POST",
+            "/timeline",
+            Some(&token),
+            Some(serde_json::json!({"limit": 2, "offset": 2})),
+        )
+        .await;
         assert_eq!(page2["items"].as_array().unwrap().len(), 2);
         assert_eq!(page2["hasMore"], true);
 
         // Page 3: limit=2, offset=4.
-        let (_, page3) = call(&r, "POST", "/timeline", Some(&token),
-            Some(serde_json::json!({"limit": 2, "offset": 4}))).await;
+        let (_, page3) = call(
+            &r,
+            "POST",
+            "/timeline",
+            Some(&token),
+            Some(serde_json::json!({"limit": 2, "offset": 4})),
+        )
+        .await;
         assert_eq!(page3["items"].as_array().unwrap().len(), 1);
         assert_eq!(page3["hasMore"], false);
     }
@@ -993,13 +1326,25 @@ mod tests {
 
         // Create 3 tweets.
         for i in 0..3 {
-            call(&r, "POST", "/tweets", Some(&token),
-                Some(serde_json::json!({"content": format!("T{}", i)}))).await;
+            call(
+                &r,
+                "POST",
+                "/tweets",
+                Some(&token),
+                Some(serde_json::json!({"content": format!("T{}", i)})),
+            )
+            .await;
         }
 
         // No pagination params → default limit=20.
-        let (s, all) = call(&r, "POST", "/timeline", Some(&token),
-            Some(serde_json::json!({}))).await;
+        let (s, all) = call(
+            &r,
+            "POST",
+            "/timeline",
+            Some(&token),
+            Some(serde_json::json!({})),
+        )
+        .await;
         assert_eq!(s, StatusCode::OK);
         assert_eq!(all["items"].as_array().unwrap().len(), 3);
         assert_eq!(all["hasMore"], false);
@@ -1010,11 +1355,23 @@ mod tests {
         let (r, jwt) = setup();
         let token = jwt.issue("alice", "Alice").unwrap();
 
-        call(&r, "POST", "/tweets", Some(&token),
-            Some(serde_json::json!({"content": "Only tweet"}))).await;
+        call(
+            &r,
+            "POST",
+            "/tweets",
+            Some(&token),
+            Some(serde_json::json!({"content": "Only tweet"})),
+        )
+        .await;
 
-        let (_, page) = call(&r, "POST", "/timeline", Some(&token),
-            Some(serde_json::json!({"limit": 10, "offset": 100}))).await;
+        let (_, page) = call(
+            &r,
+            "POST",
+            "/timeline",
+            Some(&token),
+            Some(serde_json::json!({"limit": 10, "offset": 100})),
+        )
+        .await;
         assert_eq!(page["items"].as_array().unwrap().len(), 0);
         assert_eq!(page["hasMore"], false);
     }
@@ -1031,12 +1388,18 @@ mod tests {
         let updated_at = me["updatedAt"].as_str().unwrap();
 
         // Update with correct updatedAt → success.
-        let (s, updated) = call(&r, "PUT", "/me/profile", Some(&token),
+        let (s, updated) = call(
+            &r,
+            "PUT",
+            "/me/profile",
+            Some(&token),
             Some(serde_json::json!({
                 "displayName": "Alice Updated",
                 "bio": "New bio",
                 "updatedAt": updated_at,
-            }))).await;
+            })),
+        )
+        .await;
         assert_eq!(s, StatusCode::OK);
         assert_eq!(updated["displayName"], "Alice Updated");
     }
@@ -1050,19 +1413,35 @@ mod tests {
         let (_, me) = call(&r, "GET", "/me", Some(&token), None).await;
         let old_ts = me["updatedAt"].as_str().unwrap().to_string();
 
-        call(&r, "PUT", "/me/profile", Some(&token),
+        call(
+            &r,
+            "PUT",
+            "/me/profile",
+            Some(&token),
             Some(serde_json::json!({
                 "displayName": "V1", "bio": "", "updatedAt": old_ts,
-            }))).await;
+            })),
+        )
+        .await;
 
         // Second update with the OLD timestamp → conflict.
-        let (s, body) = call(&r, "PUT", "/me/profile", Some(&token),
+        let (s, body) = call(
+            &r,
+            "PUT",
+            "/me/profile",
+            Some(&token),
             Some(serde_json::json!({
                 "displayName": "V2", "bio": "", "updatedAt": old_ts,
-            }))).await;
+            })),
+        )
+        .await;
         // Should be 409 Conflict (from KvOps or our check).
-        assert!(s == StatusCode::CONFLICT || s == StatusCode::INTERNAL_SERVER_ERROR,
-            "Expected conflict, got {} body: {:?}", s, body);
+        assert!(
+            s == StatusCode::CONFLICT || s == StatusCode::INTERNAL_SERVER_ERROR,
+            "Expected conflict, got {} body: {:?}",
+            s,
+            body
+        );
     }
 
     // ── File Upload ──
@@ -1081,9 +1460,16 @@ mod tests {
             .unwrap();
         let resp = r.clone().oneshot(req).await.unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
-        let body = axum::body::to_bytes(resp.into_body(), 1024 * 1024).await.unwrap();
+        let body = axum::body::to_bytes(resp.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-        assert!(json["url"].as_str().unwrap().contains("/blobs/uploads/alice/"));
+        assert!(
+            json["url"]
+                .as_str()
+                .unwrap()
+                .contains("/blobs/uploads/alice/")
+        );
         assert_eq!(json["size"], 4);
     }
 
@@ -1119,10 +1505,16 @@ mod tests {
         let (r, jwt) = setup();
         let token = jwt.issue("alice", "Alice").unwrap();
 
-        let (s, _) = call(&r, "PUT", "/me/profile", Some(&token),
+        let (s, _) = call(
+            &r,
+            "PUT",
+            "/me/profile",
+            Some(&token),
             Some(serde_json::json!({
                 "displayName": "No Lock", "bio": "",
-            }))).await;
+            })),
+        )
+        .await;
         assert_eq!(s, StatusCode::OK);
     }
 
@@ -1139,46 +1531,69 @@ mod tests {
         let mut b1 = LocalizedText::en("Welcome to the app.");
         b1.set("zh-CN", "欢迎使用本应用。");
         ops.save_new(crate::server::model::Message {
-            id: Id::default(), kind: "broadcast".into(),
-            sender: None, recipient: None,
-            title: t1, body: b1, read: false,
-            display_name: None, description: None, metadata: None,
-            created_at: DateTime::default(), updated_at: DateTime::default(),
-        }).unwrap();
+            id: Id::default(),
+            kind: "broadcast".into(),
+            sender: None,
+            recipient: None,
+            title: t1,
+            body: b1,
+            read: false,
+            display_name: None,
+            description: None,
+            metadata: None,
+            created_at: DateTime::default(),
+            updated_at: DateTime::default(),
+        })
+        .unwrap();
 
         let mut t2 = LocalizedText::en("Verified");
         t2.set("zh-CN", "已认证");
         let b2 = LocalizedText::en("Your account is verified.");
         ops.save_new(crate::server::model::Message {
-            id: Id::default(), kind: "personal".into(),
-            sender: None, recipient: Some(Name::new("twitter/users/alice")),
-            title: t2, body: b2, read: false,
-            display_name: None, description: None, metadata: None,
-            created_at: DateTime::default(), updated_at: DateTime::default(),
-        }).unwrap();
+            id: Id::default(),
+            kind: "personal".into(),
+            sender: None,
+            recipient: Some(Name::new("twitter/users/alice")),
+            title: t2,
+            body: b2,
+            read: false,
+            display_name: None,
+            description: None,
+            metadata: None,
+            created_at: DateTime::default(),
+            updated_at: DateTime::default(),
+        })
+        .unwrap();
     }
 
     fn setup_with_messages() -> (axum::Router, JwtService, Arc<dyn openerp_kv::KVStore>) {
         let dir = tempfile::tempdir().unwrap();
-        let kv: Arc<dyn openerp_kv::KVStore> = Arc::new(
-            openerp_kv::RedbStore::open(&dir.path().join("test.redb")).unwrap(),
-        );
+        let kv: Arc<dyn openerp_kv::KVStore> =
+            Arc::new(openerp_kv::RedbStore::open(&dir.path().join("test.redb")).unwrap());
         let jwt = JwtService::golden_test();
-        KvOps::<User>::new(kv.clone()).save_new(User {
-            id: Id::default(), username: "alice".into(),
-            password_hash: Some(PasswordHash::new(&hash_password("password"))),
-            bio: None, avatar: None,
-            follower_count: 0, following_count: 0, tweet_count: 0,
-            display_name: Some("Alice".into()),
-            description: None, metadata: None, created_at: DateTime::default(), updated_at: DateTime::default(),
-        }).unwrap();
+        KvOps::<User>::new(kv.clone())
+            .save_new(User {
+                id: Id::default(),
+                username: "alice".into(),
+                password_hash: Some(PasswordHash::new(&hash_password("password"))),
+                bio: None,
+                avatar: None,
+                follower_count: 0,
+                following_count: 0,
+                tweet_count: 0,
+                display_name: Some("Alice".into()),
+                description: None,
+                metadata: None,
+                created_at: DateTime::default(),
+                updated_at: DateTime::default(),
+            })
+            .unwrap();
         seed_messages(&kv);
 
         let blob_dir = dir.path().join("blobs");
         std::fs::create_dir_all(&blob_dir).unwrap();
-        let blobs: Arc<dyn openerp_blob::BlobStore> = Arc::new(
-            openerp_blob::FileStore::open(&blob_dir).unwrap(),
-        );
+        let blobs: Arc<dyn openerp_blob::BlobStore> =
+            Arc::new(openerp_blob::FileStore::open(&blob_dir).unwrap());
         let state = Arc::new(FacetStateInner {
             users: KvOps::new(kv.clone()),
             tweets: KvOps::new(kv.clone()),
@@ -1220,7 +1635,9 @@ mod tests {
         let req = builder.body(body).unwrap();
         let resp = router.clone().oneshot(req).await.unwrap();
         let status = resp.status();
-        let bytes = axum::body::to_bytes(resp.into_body(), 1024 * 1024).await.unwrap();
+        let bytes = axum::body::to_bytes(resp.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
         let json = if bytes.is_empty() {
             serde_json::json!(null)
         } else {
@@ -1238,8 +1655,16 @@ mod tests {
         let msgs = body["messages"].as_array().unwrap();
         assert_eq!(msgs.len(), 2);
         let titles: Vec<&str> = msgs.iter().map(|m| m["title"].as_str().unwrap()).collect();
-        assert!(titles.contains(&"Welcome!"), "expected Welcome!, got {:?}", titles);
-        assert!(titles.contains(&"Verified"), "expected Verified, got {:?}", titles);
+        assert!(
+            titles.contains(&"Welcome!"),
+            "expected Welcome!, got {:?}",
+            titles
+        );
+        assert!(
+            titles.contains(&"Verified"),
+            "expected Verified, got {:?}",
+            titles
+        );
         assert_eq!(body["unreadCount"].as_u64().unwrap(), 2);
     }
 

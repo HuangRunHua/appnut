@@ -15,7 +15,7 @@
 //! }
 //! ```
 
-use axum::http::{header, HeaderMap, StatusCode};
+use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use openerp_types::{Format, IntoFlatBuffer, MIME_FLATBUFFERS, MIME_JSON};
 use serde::Serialize;
@@ -74,19 +74,11 @@ where
                             .into_response();
                     }
                 };
-                (
-                    [(header::CONTENT_TYPE, MIME_JSON)],
-                    body,
-                )
-                    .into_response()
+                ([(header::CONTENT_TYPE, MIME_JSON)], body).into_response()
             }
             Format::FlatBuffers => {
                 let body = self.value.encode_flatbuffer();
-                (
-                    [(header::CONTENT_TYPE, MIME_FLATBUFFERS)],
-                    body,
-                )
-                    .into_response()
+                ([(header::CONTENT_TYPE, MIME_FLATBUFFERS)], body).into_response()
             }
         }
     }

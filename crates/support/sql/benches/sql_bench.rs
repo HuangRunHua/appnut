@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 
 use openerp_sql::{SQLStore, SqliteStore, Value};
 
@@ -16,10 +16,7 @@ fn bench_exec_insert(c: &mut Criterion) {
             store
                 .exec(
                     "INSERT INTO bench (name, value) VALUES (?1, ?2)",
-                    &[
-                        Value::Text("item-bench".to_string()),
-                        Value::Real(42.5),
-                    ],
+                    &[Value::Text("item-bench".to_string()), Value::Real(42.5)],
                 )
                 .unwrap();
         });
@@ -100,5 +97,10 @@ fn bench_query_range(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, bench_exec_insert, bench_query_by_id, bench_query_range);
+criterion_group!(
+    benches,
+    bench_exec_insert,
+    bench_query_by_id,
+    bench_query_range
+);
 criterion_main!(benches);

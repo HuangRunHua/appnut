@@ -62,8 +62,8 @@ fn classify_type(ty: &syn::Type) -> (FbFieldKind, Option<syn::Ident>) {
             let name = seg.ident.to_string();
             match name.as_str() {
                 "String" => return (FbFieldKind::String, None),
-                "bool" | "u8" | "u16" | "u32" | "u64" | "i8" | "i16" | "i32" | "i64"
-                | "f32" | "f64" => {
+                "bool" | "u8" | "u16" | "u32" | "u64" | "i8" | "i16" | "i32" | "i64" | "f32"
+                | "f64" => {
                     return (FbFieldKind::Scalar, Some(seg.ident.clone()));
                 }
                 "Option" => {
@@ -71,9 +71,7 @@ fn classify_type(ty: &syn::Type) -> (FbFieldKind, Option<syn::Ident>) {
                         let (inner_kind, inner_scalar) = classify_type(inner);
                         match inner_kind {
                             FbFieldKind::String => return (FbFieldKind::OptString, None),
-                            FbFieldKind::Scalar => {
-                                return (FbFieldKind::OptScalar, inner_scalar)
-                            }
+                            FbFieldKind::Scalar => return (FbFieldKind::OptScalar, inner_scalar),
                             _ => {}
                         }
                     }
@@ -83,9 +81,7 @@ fn classify_type(ty: &syn::Type) -> (FbFieldKind, Option<syn::Ident>) {
                         let (inner_kind, inner_scalar) = classify_type(inner);
                         match inner_kind {
                             FbFieldKind::String => return (FbFieldKind::StringVec, None),
-                            FbFieldKind::Scalar => {
-                                return (FbFieldKind::ScalarVec, inner_scalar)
-                            }
+                            FbFieldKind::Scalar => return (FbFieldKind::ScalarVec, inner_scalar),
                             _ => {}
                         }
                     }
@@ -154,11 +150,9 @@ fn emit_encode_table(ident: &syn::Ident, fields: &[FbField]) -> TokenStream {
                 FbFieldKind::StringVec => Some(quote! {
                     let #off_name = openerp_types::create_string_vector(__fb_builder, &self.#name);
                 }),
-                FbFieldKind::ScalarVec => {
-                    Some(quote! {
-                        let #off_name = __fb_builder.create_vector(&self.#name);
-                    })
-                }
+                FbFieldKind::ScalarVec => Some(quote! {
+                    let #off_name = __fb_builder.create_vector(&self.#name);
+                }),
                 _ => None,
             }
         })

@@ -14,7 +14,11 @@ pub fn expand(attr: TokenStream, item: ItemEnum) -> syn::Result<TokenStream> {
     let enum_name_str = enum_name.to_string();
     let vis = &item.vis;
 
-    let doc_attrs: Vec<_> = item.attrs.iter().filter(|a| a.path().is_ident("doc")).collect();
+    let doc_attrs: Vec<_> = item
+        .attrs
+        .iter()
+        .filter(|a| a.path().is_ident("doc"))
+        .collect();
     let pass_attrs: Vec<_> = item
         .attrs
         .iter()
@@ -145,9 +149,7 @@ fn parse_module_attr(attr: TokenStream) -> syn::Result<String> {
     impl syn::parse::Parse for AttrArgs {
         fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
             let parsed =
-                syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated(
-                    input,
-                )?;
+                syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated(input)?;
             Ok(Self(parsed.into_iter().collect()))
         }
     }

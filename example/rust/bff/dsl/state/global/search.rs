@@ -1,9 +1,9 @@
 //! Search state — stored at `search/state`.
 
-use flux_derive::state;
-use serde::{Deserialize, Serialize};
 use super::auth::UserProfile;
 use super::timeline::FeedItem;
+use flux_derive::state;
+use serde::{Deserialize, Serialize};
 
 /// Search results page.
 #[state("search/state")]

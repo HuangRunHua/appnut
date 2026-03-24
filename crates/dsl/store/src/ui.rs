@@ -51,9 +51,7 @@ pub fn apply_overrides(schema: &mut Value, overrides: &[WidgetOverride]) {
                             resource.get_mut("fields").and_then(|f| f.as_array_mut())
                         {
                             for field in fields.iter_mut() {
-                                if field.get("name").and_then(|n| n.as_str())
-                                    == Some(field_name)
-                                {
+                                if field.get("name").and_then(|n| n.as_str()) == Some(field_name) {
                                     // Set widget.
                                     field["widget"] = Value::String(ov.widget.clone());
                                     // Merge params.
@@ -140,7 +138,13 @@ mod tests {
 
         apply_overrides(&mut schema, &overrides);
 
-        assert_eq!(schema["modules"][0]["resources"][0]["fields"][0]["widget"], "textarea");
-        assert_eq!(schema["modules"][0]["resources"][1]["fields"][0]["widget"], "textarea");
+        assert_eq!(
+            schema["modules"][0]["resources"][0]["fields"][0]["widget"],
+            "textarea"
+        );
+        assert_eq!(
+            schema["modules"][0]["resources"][1]["fields"][0]["widget"],
+            "textarea"
+        );
     }
 }

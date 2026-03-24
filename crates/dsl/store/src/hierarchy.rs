@@ -1,6 +1,6 @@
 //! Resource hierarchy — tree structure for navigation and relations.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// A node in the resource hierarchy tree.
 #[derive(Debug, Clone)]

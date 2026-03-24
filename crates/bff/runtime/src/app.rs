@@ -357,11 +357,14 @@ mod tests {
     async fn handler_sets_multiple_states() {
         let flux = Flux::new();
 
-        flux.on("app/initialize", |_, _, store: Arc<StateStore>| async move {
-            store.set("auth/state", "unauthenticated".to_string());
-            store.set("auth/terms", false);
-            store.set("app/route", "/onboarding".to_string());
-        });
+        flux.on(
+            "app/initialize",
+            |_, _, store: Arc<StateStore>| async move {
+                store.set("auth/state", "unauthenticated".to_string());
+                store.set("auth/terms", false);
+                store.set("app/route", "/onboarding".to_string());
+            },
+        );
 
         flux.emit("app/initialize", ()).await;
 
@@ -405,10 +408,7 @@ mod tests {
         flux.emit("increment", ()).await;
         flux.emit("increment", ()).await;
 
-        assert_eq!(
-            flux.get("counter").unwrap().downcast_ref::<u32>(),
-            Some(&3)
-        );
+        assert_eq!(flux.get("counter").unwrap().downcast_ref::<u32>(), Some(&3));
     }
 
     // ========================================================================
@@ -443,11 +443,14 @@ mod tests {
             pc.lock().unwrap().push(path.to_string());
         });
 
-        flux.on("app/initialize", |_, _, store: Arc<StateStore>| async move {
-            store.set("auth/state", "unauthenticated".to_string());
-            store.set("auth/terms", false);
-            store.set("app/route", "/onboarding".to_string());
-        });
+        flux.on(
+            "app/initialize",
+            |_, _, store: Arc<StateStore>| async move {
+                store.set("auth/state", "unauthenticated".to_string());
+                store.set("auth/terms", false);
+                store.set("app/route", "/onboarding".to_string());
+            },
+        );
 
         flux.emit("app/initialize", ()).await;
 
@@ -574,24 +577,32 @@ mod tests {
         let flux = Flux::new();
 
         // Handler: app/initialize
-        flux.on("app/initialize", |_, _, store: Arc<StateStore>| async move {
-            store.set(
-                "auth/state",
-                AuthState {
-                    phase: "unauthenticated".into(),
-                    busy: false,
-                },
-            );
-            store.set("auth/terms", TermsState { accepted: false });
-            store.set("app/route", "/onboarding".to_string());
-        });
+        flux.on(
+            "app/initialize",
+            |_, _, store: Arc<StateStore>| async move {
+                store.set(
+                    "auth/state",
+                    AuthState {
+                        phase: "unauthenticated".into(),
+                        busy: false,
+                    },
+                );
+                store.set("auth/terms", TermsState { accepted: false });
+                store.set("app/route", "/onboarding".to_string());
+            },
+        );
 
         // Handler: auth/accept-terms
         flux.on(
             "auth/accept-terms",
             |_, payload, store: Arc<StateStore>| async move {
                 let req = payload.downcast_ref::<AcceptTermsReq>().unwrap();
-                store.set("auth/terms", TermsState { accepted: req.accepted });
+                store.set(
+                    "auth/terms",
+                    TermsState {
+                        accepted: req.accepted,
+                    },
+                );
                 if req.accepted {
                     store.set("app/route", "/login".to_string());
                 }
