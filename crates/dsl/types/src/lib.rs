@@ -309,7 +309,7 @@ impl fmt::Display for Field {
 }
 
 /// Map a type name to a UI widget string. Used by the `#[model]` macro.
-pub const fn widget_for_type(ty: &str) -> &str {
+pub const fn widget_for_type(_ty: &str) -> &str {
     // const fn can't do string matching in stable Rust, so the macro
     // will call a non-const helper. This is a placeholder.
     "text"
@@ -318,9 +318,9 @@ pub const fn widget_for_type(ty: &str) -> &str {
 /// Known DSL builtin type names — anything not in this set that starts
 /// with an uppercase letter is assumed to be a `#[dsl_enum]` → `"select"`.
 ///
-/// **Must stay in sync with `openerp_macro::model::BUILTIN_TYPES`.**
+/// **Must stay in sync with `openerp_macro::model::_BUILTIN_TYPES`.**
 /// Duplicated here because proc-macro crates cannot depend on runtime crates.
-const BUILTIN_TYPES: &[&str] = &[
+const _BUILTIN_TYPES: &[&str] = &[
     "Id", "Email", "Phone", "Url", "Avatar", "ImageUrl",
     "Password", "PasswordHash", "Secret",
     "Text", "Markdown", "Code",

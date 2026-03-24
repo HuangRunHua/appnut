@@ -10,7 +10,7 @@ use axum::extract::{Path, Query, State};
 use axum::http::HeaderMap;
 use axum::routing::get;
 use axum::{Json, Router};
-use openerp_core::{Authenticator, CountResult, ListParams, ListResult, ServiceError};
+use openerp_core::{Authenticator, CountResult, ListParams, ServiceError};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 

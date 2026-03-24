@@ -8,7 +8,6 @@ use std::sync::Arc;
 
 use axum::extract::{Path, State};
 use axum::http::HeaderMap;
-use axum::response::IntoResponse;
 use axum::Json;
 
 use openerp_core::ServiceError;
@@ -49,7 +48,7 @@ fn current_user(headers: &HeaderMap, state: &FacetStateInner) -> Result<String, 
         ))?;
 
     let claims = state.jwt.verify(token)
-        .map_err(|e| ServiceError::Unauthorized(
+        .map_err(|_e| ServiceError::Unauthorized(
             state.i18n.t("error.auth.invalid_token", &[])
         ))?;
 
@@ -126,7 +125,7 @@ fn verify_password(password: &str, hash: &str) -> bool {
 
 /// POST /auth/login — public, no JWT required.
 pub async fn login(
-    headers: HeaderMap,
+    _headers: HeaderMap,
     State(state): State<FacetState>,
     Json(req): Json<LoginRequest>,
 ) -> Result<Json<LoginResponse>, ServiceError> {
@@ -521,7 +520,7 @@ pub async fn mark_read(
     State(state): State<FacetState>,
     Path(id): Path<String>,
 ) -> Result<Json<AppMessage>, ServiceError> {
-    let uid = current_user(&headers, &state)?;
+    let _uid = current_user(&headers, &state)?;
     let lang = lang_from_headers(&headers);
     let mut msg = state.messages.get(&id)
         .map_err(|e| ServiceError::Internal(e.to_string()))?
@@ -555,7 +554,7 @@ openerp_macro::impl_handler!(app::MarkRead);
 /// Build the facet router.
 pub fn facet_router(state: FacetState) -> axum::Router {
     app::__assert_handlers::<app::__Handlers>();
-    use axum::routing::{get, post, put, delete};
+    use axum::routing::{get, post, put};
     axum::Router::new()
         .route("/auth/login", post(login))
         .route("/me", get(get_me))

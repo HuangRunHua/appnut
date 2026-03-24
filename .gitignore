@@ -1,3 +1,24 @@
 /openteam/
 /target/
 .DS_Store
+/docs/internal/
+
+# Xcode / Swift Package Manager
+.build/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+xcuserdata/
+DerivedData/
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+*.swp
+Package.resolved
+
+# Flutter
+example/twitter_flux/.dart_tool/
+example/twitter_flux/.packages
+example/twitter_flux/build/
+example/twitter_flux/.flutter-plugins
+example/twitter_flux/.flutter-plugins-dependencies

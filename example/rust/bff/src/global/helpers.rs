@@ -1,8 +1,6 @@
 //! Shared helpers for handlers.
 //! Now uses HTTP client instead of direct KvOps.
 
-use openerp_client::ResourceClient;
-
 use crate::state::*;
 use crate::server::model;
 

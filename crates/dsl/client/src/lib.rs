@@ -553,6 +553,7 @@ impl FacetClientBase {
             .map_err(|e| ApiError::Decode(e.to_string()))
     }
 
+    #[allow(dead_code)]
     async fn check_status(resp: &reqwest::Response) -> Result<(), ApiError> {
         if !resp.status().is_success() {
             // We can't consume the body here since resp is borrowed,
