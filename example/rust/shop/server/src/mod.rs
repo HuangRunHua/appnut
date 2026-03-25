@@ -139,10 +139,7 @@ fn hierarchy() -> Vec<HierarchyNode> {
             icon: "folder",
             description: "Product categories",
             children: vec![HierarchyNode::leaf(
-                "product",
-                "Products",
-                "package",
-                "Products",
+                "product", "Products", "package", "Products",
             )],
         },
         HierarchyNode {

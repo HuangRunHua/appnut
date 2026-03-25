@@ -253,9 +253,27 @@ fn seed_data(kv: &Arc<dyn openerp_kv::KVStore>) {
         .ok();
 
     let bob_products = [
-        ("Rust Phone Pro", "Latest smartphone with Rust-powered firmware", 99900u64, 50u32, p.id.to_string()),
-        ("USB-C Hub 7-in-1", "Premium USB-C hub with HDMI, USB-A, SD card", 4999, 200, e.id.to_string()),
-        ("Mechanical Keyboard", "Cherry MX Blue switches, RGB backlight", 12999, 100, e.id.to_string()),
+        (
+            "Rust Phone Pro",
+            "Latest smartphone with Rust-powered firmware",
+            99900u64,
+            50u32,
+            p.id.to_string(),
+        ),
+        (
+            "USB-C Hub 7-in-1",
+            "Premium USB-C hub with HDMI, USB-A, SD card",
+            4999,
+            200,
+            e.id.to_string(),
+        ),
+        (
+            "Mechanical Keyboard",
+            "Cherry MX Blue switches, RGB backlight",
+            12999,
+            100,
+            e.id.to_string(),
+        ),
     ];
     for &(title, desc, price, stock, ref cat_id) in &bob_products {
         products_ops
@@ -285,9 +303,24 @@ fn seed_data(kv: &Arc<dyn openerp_kv::KVStore>) {
     }
 
     let carol_products = [
-        ("Silk Scarf", "100% mulberry silk, hand-rolled edges", 8999u64, 30u32),
-        ("Leather Tote Bag", "Full-grain leather, handmade", 25999, 15),
-        ("Cashmere Sweater", "Premium cashmere, ribbed collar", 19999, 25),
+        (
+            "Silk Scarf",
+            "100% mulberry silk, hand-rolled edges",
+            8999u64,
+            30u32,
+        ),
+        (
+            "Leather Tote Bag",
+            "Full-grain leather, handmade",
+            25999,
+            15,
+        ),
+        (
+            "Cashmere Sweater",
+            "Premium cashmere, ribbed collar",
+            19999,
+            25,
+        ),
     ];
     for &(title, desc, price, stock) in &carol_products {
         products_ops
@@ -353,9 +386,7 @@ fn seed_data(kv: &Arc<dyn openerp_kv::KVStore>) {
         })
         .ok();
 
-    info!(
-        "Seeded: 4 users, 2 shops, 4 categories, 6 products, 2 addresses"
-    );
+    info!("Seeded: 4 users, 2 shops, 4 categories, 6 products, 2 addresses");
     info!("All users password: password");
 }
 

@@ -234,9 +234,27 @@ fn seed_demo_data(kv: &Arc<dyn openerp_kv::KVStore>) {
 
     // E-06-04: Products (Bob's shop — 3 electronics)
     let product_data_bob = [
-        ("Rust Phone Pro", "Latest smartphone with Rust-powered firmware", 99900u64, 50u32, &phones_id),
-        ("USB-C Hub 7-in-1", "Premium USB-C hub with HDMI, USB-A, SD card", 4999, 200, &electronics_id),
-        ("Mechanical Keyboard", "Cherry MX Blue switches, RGB backlight", 12999, 100, &electronics_id),
+        (
+            "Rust Phone Pro",
+            "Latest smartphone with Rust-powered firmware",
+            99900u64,
+            50u32,
+            &phones_id,
+        ),
+        (
+            "USB-C Hub 7-in-1",
+            "Premium USB-C hub with HDMI, USB-A, SD card",
+            4999,
+            200,
+            &electronics_id,
+        ),
+        (
+            "Mechanical Keyboard",
+            "Cherry MX Blue switches, RGB backlight",
+            12999,
+            100,
+            &electronics_id,
+        ),
     ];
     let mut bob_product_ids = Vec::new();
     for &(title, desc, price, stock, cat_id) in &product_data_bob {
@@ -269,9 +287,27 @@ fn seed_demo_data(kv: &Arc<dyn openerp_kv::KVStore>) {
 
     // Products (Carol's shop — 3 fashion)
     let product_data_carol = [
-        ("Silk Scarf", "100% mulberry silk, hand-rolled edges", 8999u64, 30u32, &clothing_id),
-        ("Leather Tote Bag", "Full-grain leather, handmade", 25999, 15, &clothing_id),
-        ("Cashmere Sweater", "Premium cashmere, ribbed collar", 19999, 25, &clothing_id),
+        (
+            "Silk Scarf",
+            "100% mulberry silk, hand-rolled edges",
+            8999u64,
+            30u32,
+            &clothing_id,
+        ),
+        (
+            "Leather Tote Bag",
+            "Full-grain leather, handmade",
+            25999,
+            15,
+            &clothing_id,
+        ),
+        (
+            "Cashmere Sweater",
+            "Premium cashmere, ribbed collar",
+            19999,
+            25,
+            &clothing_id,
+        ),
     ];
     for &(title, desc, price, stock, cat_id) in &product_data_carol {
         products_ops

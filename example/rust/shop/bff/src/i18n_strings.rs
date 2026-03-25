@@ -27,18 +27,27 @@ struct UiStrings {
 impl UiStrings {
     fn new() -> Self {
         let mut m = HashMap::new();
-        m.insert("ui/login/title", ["Welcome to ShopFlux", "欢迎来到 ShopFlux"]);
+        m.insert(
+            "ui/login/title",
+            ["Welcome to ShopFlux", "欢迎来到 ShopFlux"],
+        );
         m.insert("ui/login/button", ["Sign In", "登录"]);
         m.insert("ui/tab/home", ["Home", "首页"]);
         m.insert("ui/tab/categories", ["Categories", "分类"]);
         m.insert("ui/tab/cart", ["Cart", "购物车"]);
         m.insert("ui/tab/orders", ["Orders", "订单"]);
         m.insert("ui/tab/me", ["Me", "我"]);
-        m.insert("ui/search/placeholder", ["Search products...", "搜索商品..."]);
+        m.insert(
+            "ui/search/placeholder",
+            ["Search products...", "搜索商品..."],
+        );
         m.insert("ui/cart/empty", ["Your cart is empty", "购物车为空"]);
         m.insert("ui/cart/checkout", ["Checkout", "去结算"]);
         m.insert("ui/order/pay", ["Pay Now", "立即支付"]);
-        m.insert("ui/order/status/pending_payment", ["Pending Payment", "待付款"]);
+        m.insert(
+            "ui/order/status/pending_payment",
+            ["Pending Payment", "待付款"],
+        );
         m.insert("ui/order/status/paid", ["Paid", "已付款"]);
         m.insert("ui/order/status/shipped", ["Shipped", "已发货"]);
         m.insert("ui/order/status/completed", ["Completed", "已完成"]);
@@ -75,8 +84,14 @@ impl ErrorStrings {
             "error/auth/invalid_token",
             ["Invalid or expired token", "无效或过期的令牌"],
         );
-        m.insert("error/auth/user_not_found", ["User not found", "用户不存在"]);
-        m.insert("error/product/not_found", ["Product not found", "商品不存在"]);
+        m.insert(
+            "error/auth/user_not_found",
+            ["User not found", "用户不存在"],
+        );
+        m.insert(
+            "error/product/not_found",
+            ["Product not found", "商品不存在"],
+        );
         m.insert("error/order/not_found", ["Order not found", "订单不存在"]);
         m.insert(
             "error/stock/insufficient",

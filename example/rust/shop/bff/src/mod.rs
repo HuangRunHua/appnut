@@ -234,11 +234,7 @@ impl ShopBff {
     }
 
     #[handle(LoadProductDetailReq)]
-    pub async fn handle_load_product_detail(
-        &self,
-        req: &LoadProductDetailReq,
-        store: &StateStore,
-    ) {
+    pub async fn handle_load_product_detail(&self, req: &LoadProductDetailReq, store: &StateStore) {
         let path = format!("/products/{}", req.product_id);
         if let Some(val) = self.authed_get(&path).await {
             if let Ok(p) = serde_json::from_value::<app::AppProduct>(val) {

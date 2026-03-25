@@ -175,7 +175,9 @@ pub async fn category_list(
         .list()
         .map_err(|e| ServiceError::Internal(e.to_string()))?;
     cats.sort_by_key(|c| c.sort_order);
-    Ok(Json(cats.iter().map(|c| to_app_category(c, &lang)).collect()))
+    Ok(Json(
+        cats.iter().map(|c| to_app_category(c, &lang)).collect(),
+    ))
 }
 
 // ── E-02-03: Category products ──
@@ -698,13 +700,11 @@ pub async fn create_review(
             .unwrap_or_default()
             .iter()
             .any(|oi| {
-                oi.order.resource_id() == o.id.as_str()
-                    && oi.product.resource_id() == product_id
+                oi.order.resource_id() == o.id.as_str() && oi.product.resource_id() == product_id
             })
     });
-    let order = purchased_order.ok_or_else(|| {
-        ServiceError::Validation(state.i18n.t("error.order.not_purchased", &[]))
-    })?;
+    let order = purchased_order
+        .ok_or_else(|| ServiceError::Validation(state.i18n.t("error.order.not_purchased", &[])))?;
 
     let existing = state
         .reviews
