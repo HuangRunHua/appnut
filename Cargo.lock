@@ -416,6 +416,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "flux-shop"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "axum",
+ "base64",
+ "chrono",
+ "flatbuffers",
+ "flux-derive",
+ "flux-ffi",
+ "jsonwebtoken",
+ "openerp-blob",
+ "openerp-client",
+ "openerp-core",
+ "openerp-flux",
+ "openerp-kv",
+ "openerp-macro",
+ "openerp-search",
+ "openerp-store",
+ "openerp-types",
+ "openerp-web",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tower",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
