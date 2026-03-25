@@ -905,12 +905,12 @@ pub async fn delete_address(
     Path(id): Path<String>,
 ) -> Result<(), ServiceError> {
     let uid = current_user(&headers, &state)?;
-    if let Ok(Some(addr)) = state.addresses.get(&id) {
-        if addr.user.resource_id() != uid {
-            return Err(ServiceError::NotFound(
-                state.i18n.t("error.address.not_found", &[("id", &id)]),
-            ));
-        }
+    if let Ok(Some(addr)) = state.addresses.get(&id)
+        && addr.user.resource_id() != uid
+    {
+        return Err(ServiceError::NotFound(
+            state.i18n.t("error.address.not_found", &[("id", &id)]),
+        ));
     }
     state
         .addresses

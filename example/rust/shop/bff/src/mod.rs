@@ -174,25 +174,25 @@ impl ShopBff {
                 error: None,
             },
         );
-        if let Some(val) = self.authed_get("/categories").await {
-            if let Ok(cats) = serde_json::from_value::<Vec<app::AppCategory>>(val) {
-                store.set(
-                    CategoriesState::PATH,
-                    CategoriesState {
-                        items: cats
-                            .iter()
-                            .map(|c| CategoryItem {
-                                id: c.id.clone(),
-                                name: c.name.clone(),
-                                parent_id: c.parent_id.clone(),
-                                sort_order: c.sort_order,
-                            })
-                            .collect(),
-                        loading: false,
-                        error: None,
-                    },
-                );
-            }
+        if let Some(val) = self.authed_get("/categories").await
+            && let Ok(cats) = serde_json::from_value::<Vec<app::AppCategory>>(val)
+        {
+            store.set(
+                CategoriesState::PATH,
+                CategoriesState {
+                    items: cats
+                        .iter()
+                        .map(|c| CategoryItem {
+                            id: c.id.clone(),
+                            name: c.name.clone(),
+                            parent_id: c.parent_id.clone(),
+                            sort_order: c.sort_order,
+                        })
+                        .collect(),
+                    loading: false,
+                    error: None,
+                },
+            );
         }
     }
 
@@ -217,44 +217,44 @@ impl ShopBff {
             offset: 0,
         };
         let path = format!("/categories/{}/products", req.category_id);
-        if let Some(val) = self.authed_post(&path, &params).await {
-            if let Ok(resp) = serde_json::from_value::<app::ProductListResponse>(val) {
-                store.set(
-                    CatalogProductsState::PATH,
-                    CatalogProductsState {
-                        category_id: req.category_id.clone(),
-                        items: resp.items.iter().map(to_product_item).collect(),
-                        loading: false,
-                        has_more: resp.has_more,
-                        error: None,
-                    },
-                );
-            }
+        if let Some(val) = self.authed_post(&path, &params).await
+            && let Ok(resp) = serde_json::from_value::<app::ProductListResponse>(val)
+        {
+            store.set(
+                CatalogProductsState::PATH,
+                CatalogProductsState {
+                    category_id: req.category_id.clone(),
+                    items: resp.items.iter().map(to_product_item).collect(),
+                    loading: false,
+                    has_more: resp.has_more,
+                    error: None,
+                },
+            );
         }
     }
 
     #[handle(LoadProductDetailReq)]
     pub async fn handle_load_product_detail(&self, req: &LoadProductDetailReq, store: &StateStore) {
         let path = format!("/products/{}", req.product_id);
-        if let Some(val) = self.authed_get(&path).await {
-            if let Ok(p) = serde_json::from_value::<app::AppProduct>(val) {
-                store.set(
-                    ProductDetailState::PATH,
-                    ProductDetailState {
-                        id: p.id.clone(),
-                        title: p.title.clone(),
-                        description: p.description.clone(),
-                        price: p.price,
-                        stock: p.stock,
-                        images: p.images.clone(),
-                        rating: p.rating,
-                        review_count: p.review_count,
-                        shop_id: p.shop_id.clone(),
-                        shop_name: p.shop_name.clone(),
-                        loading: false,
-                    },
-                );
-            }
+        if let Some(val) = self.authed_get(&path).await
+            && let Ok(p) = serde_json::from_value::<app::AppProduct>(val)
+        {
+            store.set(
+                ProductDetailState::PATH,
+                ProductDetailState {
+                    id: p.id.clone(),
+                    title: p.title.clone(),
+                    description: p.description.clone(),
+                    price: p.price,
+                    stock: p.stock,
+                    images: p.images.clone(),
+                    rating: p.rating,
+                    review_count: p.review_count,
+                    shop_id: p.shop_id.clone(),
+                    shop_name: p.shop_name.clone(),
+                    loading: false,
+                },
+            );
         }
     }
 
@@ -284,18 +284,18 @@ impl ShopBff {
         let search_req = app::SearchRequest {
             query: req.query.clone(),
         };
-        if let Some(val) = self.authed_post("/search", &search_req).await {
-            if let Ok(resp) = serde_json::from_value::<app::ProductListResponse>(val) {
-                store.set(
-                    SearchResultsState::PATH,
-                    SearchResultsState {
-                        query: req.query.clone(),
-                        items: resp.items.iter().map(to_product_item).collect(),
-                        loading: false,
-                        error: None,
-                    },
-                );
-            }
+        if let Some(val) = self.authed_post("/search", &search_req).await
+            && let Ok(resp) = serde_json::from_value::<app::ProductListResponse>(val)
+        {
+            store.set(
+                SearchResultsState::PATH,
+                SearchResultsState {
+                    query: req.query.clone(),
+                    items: resp.items.iter().map(to_product_item).collect(),
+                    loading: false,
+                    error: None,
+                },
+            );
         }
     }
 
@@ -310,29 +310,29 @@ impl ShopBff {
                 error: None,
             },
         );
-        if let Some(val) = self.authed_post("/cart", &serde_json::json!({})).await {
-            if let Ok(resp) = serde_json::from_value::<app::CartResponse>(val) {
-                store.set(
-                    CartState::PATH,
-                    CartState {
-                        items: resp
-                            .items
-                            .iter()
-                            .map(|i| CartEntry {
-                                id: i.id.clone(),
-                                product_id: i.product_id.clone(),
-                                title: i.title.clone(),
-                                price: i.price,
-                                image: i.image.clone(),
-                                quantity: i.quantity,
-                            })
-                            .collect(),
-                        total_amount: resp.total_amount,
-                        loading: false,
-                        error: None,
-                    },
-                );
-            }
+        if let Some(val) = self.authed_post("/cart", &serde_json::json!({})).await
+            && let Ok(resp) = serde_json::from_value::<app::CartResponse>(val)
+        {
+            store.set(
+                CartState::PATH,
+                CartState {
+                    items: resp
+                        .items
+                        .iter()
+                        .map(|i| CartEntry {
+                            id: i.id.clone(),
+                            product_id: i.product_id.clone(),
+                            title: i.title.clone(),
+                            price: i.price,
+                            image: i.image.clone(),
+                            quantity: i.quantity,
+                        })
+                        .collect(),
+                    total_amount: resp.total_amount,
+                    loading: false,
+                    error: None,
+                },
+            );
         }
     }
 
@@ -342,29 +342,29 @@ impl ShopBff {
             product_id: req.product_id.clone(),
             quantity: req.quantity,
         };
-        if let Some(val) = self.authed_post("/cart/add", &add_req).await {
-            if let Ok(resp) = serde_json::from_value::<app::CartResponse>(val) {
-                store.set(
-                    CartState::PATH,
-                    CartState {
-                        items: resp
-                            .items
-                            .iter()
-                            .map(|i| CartEntry {
-                                id: i.id.clone(),
-                                product_id: i.product_id.clone(),
-                                title: i.title.clone(),
-                                price: i.price,
-                                image: i.image.clone(),
-                                quantity: i.quantity,
-                            })
-                            .collect(),
-                        total_amount: resp.total_amount,
-                        loading: false,
-                        error: None,
-                    },
-                );
-            }
+        if let Some(val) = self.authed_post("/cart/add", &add_req).await
+            && let Ok(resp) = serde_json::from_value::<app::CartResponse>(val)
+        {
+            store.set(
+                CartState::PATH,
+                CartState {
+                    items: resp
+                        .items
+                        .iter()
+                        .map(|i| CartEntry {
+                            id: i.id.clone(),
+                            product_id: i.product_id.clone(),
+                            title: i.title.clone(),
+                            price: i.price,
+                            image: i.image.clone(),
+                            quantity: i.quantity,
+                        })
+                        .collect(),
+                    total_amount: resp.total_amount,
+                    loading: false,
+                    error: None,
+                },
+            );
         }
     }
 
@@ -379,29 +379,29 @@ impl ShopBff {
         if let Some(t) = &token {
             r = r.header("authorization", format!("Bearer {}", t));
         }
-        if let Ok(resp) = r.send().await {
-            if let Ok(val) = resp.json::<app::CartResponse>().await {
-                store.set(
-                    CartState::PATH,
-                    CartState {
-                        items: val
-                            .items
-                            .iter()
-                            .map(|i| CartEntry {
-                                id: i.id.clone(),
-                                product_id: i.product_id.clone(),
-                                title: i.title.clone(),
-                                price: i.price,
-                                image: i.image.clone(),
-                                quantity: i.quantity,
-                            })
-                            .collect(),
-                        total_amount: val.total_amount,
-                        loading: false,
-                        error: None,
-                    },
-                );
-            }
+        if let Ok(resp) = r.send().await
+            && let Ok(val) = resp.json::<app::CartResponse>().await
+        {
+            store.set(
+                CartState::PATH,
+                CartState {
+                    items: val
+                        .items
+                        .iter()
+                        .map(|i| CartEntry {
+                            id: i.id.clone(),
+                            product_id: i.product_id.clone(),
+                            title: i.title.clone(),
+                            price: i.price,
+                            image: i.image.clone(),
+                            quantity: i.quantity,
+                        })
+                        .collect(),
+                    total_amount: val.total_amount,
+                    loading: false,
+                    error: None,
+                },
+            );
         }
     }
 
@@ -411,32 +411,32 @@ impl ShopBff {
             cart_item_ids: req.cart_item_ids.clone(),
             address_id: req.address_id.clone(),
         };
-        if let Some(val) = self.authed_post("/orders", &create_req).await {
-            if let Ok(detail) = serde_json::from_value::<app::AppOrderDetail>(val) {
-                store.set(
-                    OrderDetailState::PATH,
-                    OrderDetailState {
-                        id: detail.id.clone(),
-                        shop_name: detail.shop_name.clone(),
-                        status: detail.status.clone(),
-                        total_amount: detail.total_amount,
-                        items: detail
-                            .items
-                            .iter()
-                            .map(|i| OrderLineItem {
-                                product_id: i.product_id.clone(),
-                                title: i.title.clone(),
-                                price: i.price,
-                                quantity: i.quantity,
-                            })
-                            .collect(),
-                        shipping_address: detail.shipping_address.clone(),
-                        paid_at: detail.paid_at.clone(),
-                        created_at: detail.created_at.clone(),
-                        loading: false,
-                    },
-                );
-            }
+        if let Some(val) = self.authed_post("/orders", &create_req).await
+            && let Ok(detail) = serde_json::from_value::<app::AppOrderDetail>(val)
+        {
+            store.set(
+                OrderDetailState::PATH,
+                OrderDetailState {
+                    id: detail.id.clone(),
+                    shop_name: detail.shop_name.clone(),
+                    status: detail.status.clone(),
+                    total_amount: detail.total_amount,
+                    items: detail
+                        .items
+                        .iter()
+                        .map(|i| OrderLineItem {
+                            product_id: i.product_id.clone(),
+                            title: i.title.clone(),
+                            price: i.price,
+                            quantity: i.quantity,
+                        })
+                        .collect(),
+                    shipping_address: detail.shipping_address.clone(),
+                    paid_at: detail.paid_at.clone(),
+                    created_at: detail.created_at.clone(),
+                    loading: false,
+                },
+            );
         }
     }
 
@@ -455,37 +455,75 @@ impl ShopBff {
             limit: 50,
             offset: 0,
         };
-        if let Some(val) = self.authed_post("/orders/list", &params).await {
-            if let Ok(resp) = serde_json::from_value::<app::OrderListResponse>(val) {
-                store.set(
-                    OrderListState::PATH,
-                    OrderListState {
-                        items: resp
-                            .items
-                            .iter()
-                            .map(|o| OrderSummary {
-                                id: o.id.clone(),
-                                shop_name: o.shop_name.clone(),
-                                status: o.status.clone(),
-                                total_amount: o.total_amount,
-                                item_count: o.item_count,
-                                created_at: o.created_at.clone(),
-                            })
-                            .collect(),
-                        loading: false,
-                        has_more: resp.has_more,
-                        error: None,
-                    },
-                );
-            }
+        if let Some(val) = self.authed_post("/orders/list", &params).await
+            && let Ok(resp) = serde_json::from_value::<app::OrderListResponse>(val)
+        {
+            store.set(
+                OrderListState::PATH,
+                OrderListState {
+                    items: resp
+                        .items
+                        .iter()
+                        .map(|o| OrderSummary {
+                            id: o.id.clone(),
+                            shop_name: o.shop_name.clone(),
+                            status: o.status.clone(),
+                            total_amount: o.total_amount,
+                            item_count: o.item_count,
+                            created_at: o.created_at.clone(),
+                        })
+                        .collect(),
+                    loading: false,
+                    has_more: resp.has_more,
+                    error: None,
+                },
+            );
         }
     }
 
     #[handle(LoadOrderDetailReq)]
     pub async fn handle_load_order_detail(&self, req: &LoadOrderDetailReq, store: &StateStore) {
         let path = format!("/orders/{}", req.order_id);
-        if let Some(val) = self.authed_get(&path).await {
-            if let Ok(detail) = serde_json::from_value::<app::AppOrderDetail>(val) {
+        if let Some(val) = self.authed_get(&path).await
+            && let Ok(detail) = serde_json::from_value::<app::AppOrderDetail>(val)
+        {
+            store.set(
+                OrderDetailState::PATH,
+                OrderDetailState {
+                    id: detail.id.clone(),
+                    shop_name: detail.shop_name.clone(),
+                    status: detail.status.clone(),
+                    total_amount: detail.total_amount,
+                    items: detail
+                        .items
+                        .iter()
+                        .map(|i| OrderLineItem {
+                            product_id: i.product_id.clone(),
+                            title: i.title.clone(),
+                            price: i.price,
+                            quantity: i.quantity,
+                        })
+                        .collect(),
+                    shipping_address: detail.shipping_address.clone(),
+                    paid_at: detail.paid_at.clone(),
+                    created_at: detail.created_at.clone(),
+                    loading: false,
+                },
+            );
+        }
+    }
+
+    #[handle(PayOrderReq)]
+    pub async fn handle_pay_order(&self, req: &PayOrderReq, store: &StateStore) {
+        let path = format!("/orders/{}/pay", req.order_id);
+        if let Some(val) = self.authed_post(&path, &serde_json::json!({})).await
+            && let Ok(result) = serde_json::from_value::<app::PaymentResponse>(val)
+            && result.success
+        {
+            let detail_path = format!("/orders/{}", req.order_id);
+            if let Some(dval) = self.authed_get(&detail_path).await
+                && let Ok(detail) = serde_json::from_value::<app::AppOrderDetail>(dval)
+            {
                 store.set(
                     OrderDetailState::PATH,
                     OrderDetailState {
@@ -513,45 +551,6 @@ impl ShopBff {
         }
     }
 
-    #[handle(PayOrderReq)]
-    pub async fn handle_pay_order(&self, req: &PayOrderReq, store: &StateStore) {
-        let path = format!("/orders/{}/pay", req.order_id);
-        if let Some(val) = self.authed_post(&path, &serde_json::json!({})).await {
-            if let Ok(result) = serde_json::from_value::<app::PaymentResponse>(val) {
-                if result.success {
-                    let detail_path = format!("/orders/{}", req.order_id);
-                    if let Some(dval) = self.authed_get(&detail_path).await {
-                        if let Ok(detail) = serde_json::from_value::<app::AppOrderDetail>(dval) {
-                            store.set(
-                                OrderDetailState::PATH,
-                                OrderDetailState {
-                                    id: detail.id.clone(),
-                                    shop_name: detail.shop_name.clone(),
-                                    status: detail.status.clone(),
-                                    total_amount: detail.total_amount,
-                                    items: detail
-                                        .items
-                                        .iter()
-                                        .map(|i| OrderLineItem {
-                                            product_id: i.product_id.clone(),
-                                            title: i.title.clone(),
-                                            price: i.price,
-                                            quantity: i.quantity,
-                                        })
-                                        .collect(),
-                                    shipping_address: detail.shipping_address.clone(),
-                                    paid_at: detail.paid_at.clone(),
-                                    created_at: detail.created_at.clone(),
-                                    loading: false,
-                                },
-                            );
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     #[handle(LoadAddressListReq)]
     pub async fn handle_load_addresses(&self, _req: &LoadAddressListReq, store: &StateStore) {
         store.set(
@@ -561,28 +560,28 @@ impl ShopBff {
                 loading: true,
             },
         );
-        if let Some(val) = self.authed_get("/addresses").await {
-            if let Ok(addrs) = serde_json::from_value::<Vec<app::AppAddress>>(val) {
-                store.set(
-                    AddressListState::PATH,
-                    AddressListState {
-                        items: addrs
-                            .iter()
-                            .map(|a| AddressEntry {
-                                id: a.id.clone(),
-                                recipient_name: a.recipient_name.clone(),
-                                phone: a.phone.clone(),
-                                full_address: format!(
-                                    "{}{}{} {}",
-                                    a.province, a.city, a.district, a.detail
-                                ),
-                                is_default: a.is_default,
-                            })
-                            .collect(),
-                        loading: false,
-                    },
-                );
-            }
+        if let Some(val) = self.authed_get("/addresses").await
+            && let Ok(addrs) = serde_json::from_value::<Vec<app::AppAddress>>(val)
+        {
+            store.set(
+                AddressListState::PATH,
+                AddressListState {
+                    items: addrs
+                        .iter()
+                        .map(|a| AddressEntry {
+                            id: a.id.clone(),
+                            recipient_name: a.recipient_name.clone(),
+                            phone: a.phone.clone(),
+                            full_address: format!(
+                                "{}{}{} {}",
+                                a.province, a.city, a.district, a.detail
+                            ),
+                            is_default: a.is_default,
+                        })
+                        .collect(),
+                    loading: false,
+                },
+            );
         }
     }
 }
