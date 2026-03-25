@@ -11,20 +11,26 @@ use crate::server::model::*;
 
 impl KvStore for User {
     const KEY: Field = Self::id;
-    fn kv_prefix() -> &'static str { "twitter:user:" }
-    fn key_value(&self) -> String { self.id.to_string() }
+    fn kv_prefix() -> &'static str {
+        "twitter:user:"
+    }
+    fn key_value(&self) -> String {
+        self.id.to_string()
+    }
 
     fn before_create(&mut self) {
         if self.id.is_empty() {
             self.id = Id::new(&self.username);
         }
         let now = chrono::Utc::now().to_rfc3339();
-        if self.created_at.is_empty() { self.created_at = DateTime::new(&now); }
+        if self.created_at.is_empty() {
+            self.created_at = DateTime::new(&now);
+        }
         self.updated_at = DateTime::new(&now);
     }
 
     fn before_update(&mut self) {
-        self.updated_at = DateTime::new(&chrono::Utc::now().to_rfc3339());
+        self.updated_at = DateTime::new(chrono::Utc::now().to_rfc3339());
     }
 }
 
@@ -32,20 +38,26 @@ impl KvStore for User {
 
 impl KvStore for Tweet {
     const KEY: Field = Self::id;
-    fn kv_prefix() -> &'static str { "twitter:tweet:" }
-    fn key_value(&self) -> String { self.id.to_string() }
+    fn kv_prefix() -> &'static str {
+        "twitter:tweet:"
+    }
+    fn key_value(&self) -> String {
+        self.id.to_string()
+    }
 
     fn before_create(&mut self) {
         if self.id.is_empty() {
-            self.id = Id::new(&uuid::Uuid::new_v4().to_string().replace('-', ""));
+            self.id = Id::new(uuid::Uuid::new_v4().to_string().replace('-', ""));
         }
         let now = chrono::Utc::now().to_rfc3339();
-        if self.created_at.is_empty() { self.created_at = DateTime::new(&now); }
+        if self.created_at.is_empty() {
+            self.created_at = DateTime::new(&now);
+        }
         self.updated_at = DateTime::new(&now);
     }
 
     fn before_update(&mut self) {
-        self.updated_at = DateTime::new(&chrono::Utc::now().to_rfc3339());
+        self.updated_at = DateTime::new(chrono::Utc::now().to_rfc3339());
     }
 }
 
@@ -53,15 +65,25 @@ impl KvStore for Tweet {
 
 impl KvStore for Like {
     const KEY: Field = Self::id;
-    fn kv_prefix() -> &'static str { "twitter:like:" }
-    fn key_value(&self) -> String { self.id.to_string() }
+    fn kv_prefix() -> &'static str {
+        "twitter:like:"
+    }
+    fn key_value(&self) -> String {
+        self.id.to_string()
+    }
 
     fn before_create(&mut self) {
         if self.id.is_empty() {
-            self.id = Id::new(&format!("{}:{}", self.user.resource_id(), self.tweet.resource_id()));
+            self.id = Id::new(format!(
+                "{}:{}",
+                self.user.resource_id(),
+                self.tweet.resource_id()
+            ));
         }
         let now = chrono::Utc::now().to_rfc3339();
-        if self.created_at.is_empty() { self.created_at = DateTime::new(&now); }
+        if self.created_at.is_empty() {
+            self.created_at = DateTime::new(&now);
+        }
         self.updated_at = DateTime::new(&now);
     }
 }
@@ -70,20 +92,26 @@ impl KvStore for Like {
 
 impl KvStore for Message {
     const KEY: Field = Self::id;
-    fn kv_prefix() -> &'static str { "twitter:message:" }
-    fn key_value(&self) -> String { self.id.to_string() }
+    fn kv_prefix() -> &'static str {
+        "twitter:message:"
+    }
+    fn key_value(&self) -> String {
+        self.id.to_string()
+    }
 
     fn before_create(&mut self) {
         if self.id.is_empty() {
-            self.id = Id::new(&uuid::Uuid::new_v4().to_string().replace('-', ""));
+            self.id = Id::new(uuid::Uuid::new_v4().to_string().replace('-', ""));
         }
         let now = chrono::Utc::now().to_rfc3339();
-        if self.created_at.is_empty() { self.created_at = DateTime::new(&now); }
+        if self.created_at.is_empty() {
+            self.created_at = DateTime::new(&now);
+        }
         self.updated_at = DateTime::new(&now);
     }
 
     fn before_update(&mut self) {
-        self.updated_at = DateTime::new(&chrono::Utc::now().to_rfc3339());
+        self.updated_at = DateTime::new(chrono::Utc::now().to_rfc3339());
     }
 }
 
@@ -91,15 +119,25 @@ impl KvStore for Message {
 
 impl KvStore for Follow {
     const KEY: Field = Self::id;
-    fn kv_prefix() -> &'static str { "twitter:follow:" }
-    fn key_value(&self) -> String { self.id.to_string() }
+    fn kv_prefix() -> &'static str {
+        "twitter:follow:"
+    }
+    fn key_value(&self) -> String {
+        self.id.to_string()
+    }
 
     fn before_create(&mut self) {
         if self.id.is_empty() {
-            self.id = Id::new(&format!("{}:{}", self.follower.resource_id(), self.followee.resource_id()));
+            self.id = Id::new(format!(
+                "{}:{}",
+                self.follower.resource_id(),
+                self.followee.resource_id()
+            ));
         }
         let now = chrono::Utc::now().to_rfc3339();
-        if self.created_at.is_empty() { self.created_at = DateTime::new(&now); }
+        if self.created_at.is_empty() {
+            self.created_at = DateTime::new(&now);
+        }
         self.updated_at = DateTime::new(&now);
     }
 }

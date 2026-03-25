@@ -152,9 +152,6 @@ mod tests {
             config.resolve_sqlite_path(),
             PathBuf::from("/data/data.sqlite")
         );
-        assert_eq!(
-            config.resolve_search_dir(),
-            PathBuf::from("/data/search")
-        );
+        assert_eq!(config.resolve_search_dir(), PathBuf::from("/data/search"));
     }
 }

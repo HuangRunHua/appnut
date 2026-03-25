@@ -8,7 +8,7 @@
 
 use openerp_core::ServiceError;
 use openerp_types::{DslModel, Field};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use std::sync::Arc;
 
 /// Trait implemented by models for SQL-backed storage.
@@ -89,7 +89,8 @@ impl<T: SqlStore + DslModel> SqlOps<T> {
         let invalid = <T as DslModel>::validate_names(record);
         if let Some((field, value)) = invalid.first() {
             return Err(ServiceError::Validation(format!(
-                "invalid resource name in field '{}': '{}'", field, value
+                "invalid resource name in field '{}': '{}'",
+                field, value
             )));
         }
         Ok(())
@@ -109,7 +110,14 @@ impl<T: SqlStore + DslModel> SqlOps<T> {
 
         // PK constraint.
         let pk_cols: Vec<&str> = T::PK.iter().map(|f| f.name).collect();
-        let pk = format!("PRIMARY KEY ({})", pk_cols.iter().map(|c| format!("\"{}\"", c)).collect::<Vec<_>>().join(", "));
+        let pk = format!(
+            "PRIMARY KEY ({})",
+            pk_cols
+                .iter()
+                .map(|c| format!("\"{}\"", c))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
 
         let create_sql = format!(
             "CREATE TABLE IF NOT EXISTS \"{}\" ({}, {})",
@@ -117,16 +125,17 @@ impl<T: SqlStore + DslModel> SqlOps<T> {
             cols.join(", "),
             pk
         );
-        self.sql
-            .exec(&create_sql, &[])
-            .map_err(Self::sql_err)?;
+        self.sql.exec(&create_sql, &[]).map_err(Self::sql_err)?;
 
         // Unique constraints.
         for (i, group) in T::UNIQUE.iter().enumerate() {
             let ucols: Vec<String> = group.iter().map(|f| format!("\"{}\"", f.name)).collect();
             let idx_sql = format!(
                 "CREATE UNIQUE INDEX IF NOT EXISTS \"idx_{}_uq_{}\" ON \"{}\" ({})",
-                table, i, table, ucols.join(", ")
+                table,
+                i,
+                table,
+                ucols.join(", ")
             );
             self.sql.exec(&idx_sql, &[]).map_err(Self::sql_err)?;
         }
@@ -136,7 +145,9 @@ impl<T: SqlStore + DslModel> SqlOps<T> {
             let icols: Vec<String> = group.iter().map(|f| format!("\"{}\"", f.name)).collect();
             let idx_sql = format!(
                 "CREATE INDEX IF NOT EXISTS \"idx_{}_{i}\" ON \"{}\" ({})",
-                table, table, icols.join(", ")
+                table,
+                table,
+                icols.join(", ")
             );
             self.sql.exec(&idx_sql, &[]).map_err(Self::sql_err)?;
         }
@@ -185,9 +196,8 @@ impl<T: SqlStore + DslModel> SqlOps<T> {
 
     /// Get a record or return NotFound.
     pub fn get_or_err(&self, pk: &[&str]) -> Result<T, ServiceError> {
-        self.get(pk)?.ok_or_else(|| {
-            ServiceError::NotFound(format!("{} not found", T::table_name()))
-        })
+        self.get(pk)?
+            .ok_or_else(|| ServiceError::NotFound(format!("{} not found", T::table_name())))
     }
 
     /// List all records.
@@ -236,10 +246,10 @@ impl<T: SqlStore + DslModel> SqlOps<T> {
     pub fn count(&self) -> Result<usize, ServiceError> {
         let sql = format!("SELECT COUNT(*) AS cnt FROM \"{}\"", T::table_name());
         let rows = self.sql.query(&sql, &[]).map_err(Self::sql_err)?;
-        if let Some(row) = rows.first() {
-            if let Some(openerp_sql::Value::Integer(n)) = row.get("cnt") {
-                return Ok(*n as usize);
-            }
+        if let Some(row) = rows.first()
+            && let Some(openerp_sql::Value::Integer(n)) = row.get("cnt")
+        {
+            return Ok(*n as usize);
         }
         Ok(0)
     }
@@ -288,7 +298,7 @@ impl<T: SqlStore + DslModel> SqlOps<T> {
             placeholders.push(format!("?{}", i + 1));
             let val = json_val
                 .get(f.name)
-                .or_else(|| json_val.get(&to_camel_case(f.name)))
+                .or_else(|| json_val.get(to_camel_case(f.name)))
                 .map(|v| match v {
                     serde_json::Value::String(s) => openerp_sql::Value::Text(s.clone()),
                     serde_json::Value::Number(n) => {
@@ -331,8 +341,14 @@ impl<T: SqlStore + DslModel> SqlOps<T> {
             let incoming_json = serde_json::to_value(&record)
                 .map_err(|e| ServiceError::Internal(format!("serialize: {}", e)))?;
 
-            let existing_ts = existing_json.get("updatedAt").and_then(|v| v.as_str()).unwrap_or("");
-            let incoming_ts = incoming_json.get("updatedAt").and_then(|v| v.as_str()).unwrap_or("");
+            let existing_ts = existing_json
+                .get("updatedAt")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let incoming_ts = incoming_json
+                .get("updatedAt")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
 
             if incoming_ts != existing_ts {
                 return Err(ServiceError::Conflict(format!(
@@ -414,7 +430,7 @@ impl<T: SqlStore + DslModel> SqlOps<T> {
             set_clauses.push(format!("\"{}\" = ?{}", f.name, idx));
             let val = json_val
                 .get(f.name)
-                .or_else(|| json_val.get(&to_camel_case(f.name)))
+                .or_else(|| json_val.get(to_camel_case(f.name)))
                 .map(|v| match v {
                     serde_json::Value::String(s) => openerp_sql::Value::Text(s.clone()),
                     serde_json::Value::Number(n) => {
@@ -573,9 +589,7 @@ fn json_value_matches_str(v: &serde_json::Value, expected: &str) -> bool {
     match v {
         serde_json::Value::String(s) => s == expected,
         serde_json::Value::Number(n) => n.to_string() == expected,
-        serde_json::Value::Bool(b) => {
-            (expected == "true" && *b) || (expected == "false" && !*b)
-        }
+        serde_json::Value::Bool(b) => (expected == "true" && *b) || (expected == "false" && !*b),
         serde_json::Value::Null => expected.is_empty(),
         _ => false,
     }
@@ -627,9 +641,15 @@ mod tests {
     }
 
     impl DslModel for Device {
-        fn module() -> &'static str { "test" }
-        fn resource() -> &'static str { "device" }
-        fn resource_path() -> &'static str { "devices" }
+        fn module() -> &'static str {
+            "test"
+        }
+        fn resource() -> &'static str {
+            "device"
+        }
+        fn resource_path() -> &'static str {
+            "devices"
+        }
     }
 
     fn make_ops() -> (SqlOps<Device>, tempfile::TempDir) {
@@ -664,10 +684,9 @@ mod tests {
         let by_model = ops.find_by(&Device::PK[0], "SN001").unwrap();
         assert_eq!(by_model.len(), 1);
 
-        let by_status = ops.find_by(
-            &Field::new("status", "String", "text"),
-            "active",
-        ).unwrap();
+        let by_status = ops
+            .find_by(&Field::new("status", "String", "text"), "active")
+            .unwrap();
         assert_eq!(by_status.len(), 1);
 
         // Delete.
@@ -707,13 +726,26 @@ mod tests {
     fn sql_unique_violation() {
         let (ops, _dir) = make_ops();
 
-        let d1 = Device { sn: "DUP001".into(), model: 1, status: "a".into(), description: None };
+        let d1 = Device {
+            sn: "DUP001".into(),
+            model: 1,
+            status: "a".into(),
+            description: None,
+        };
         ops.save_new(d1).unwrap();
 
-        let d2 = Device { sn: "DUP001".into(), model: 2, status: "b".into(), description: None };
+        let d2 = Device {
+            sn: "DUP001".into(),
+            model: 2,
+            status: "b".into(),
+            description: None,
+        };
         let err = ops.save_new(d2).unwrap_err();
-        assert!(err.to_string().contains("UNIQUE") || err.to_string().contains("already exists"),
-            "Duplicate PK should fail: {}", err);
+        assert!(
+            err.to_string().contains("UNIQUE") || err.to_string().contains("already exists"),
+            "Duplicate PK should fail: {}",
+            err
+        );
     }
 
     #[test]
@@ -748,9 +780,15 @@ mod tests {
     }
 
     impl DslModel for Firmware {
-        fn module() -> &'static str { "test" }
-        fn resource() -> &'static str { "firmware" }
-        fn resource_path() -> &'static str { "firmware" }
+        fn module() -> &'static str {
+            "test"
+        }
+        fn resource() -> &'static str {
+            "firmware"
+        }
+        fn resource_path() -> &'static str {
+            "firmware"
+        }
     }
 
     #[test]
@@ -791,25 +829,41 @@ mod tests {
         }
 
         // Page 1: limit=2.
-        let params = openerp_core::ListParams { limit: 2, offset: 0, ..Default::default() };
+        let params = openerp_core::ListParams {
+            limit: 2,
+            offset: 0,
+            ..Default::default()
+        };
         let result = ops.list_paginated(&params).unwrap();
         assert_eq!(result.items.len(), 2);
         assert!(result.has_more);
 
         // Page 2.
-        let params = openerp_core::ListParams { limit: 2, offset: 2, ..Default::default() };
+        let params = openerp_core::ListParams {
+            limit: 2,
+            offset: 2,
+            ..Default::default()
+        };
         let result = ops.list_paginated(&params).unwrap();
         assert_eq!(result.items.len(), 2);
         assert!(result.has_more);
 
         // Page 3 (last).
-        let params = openerp_core::ListParams { limit: 2, offset: 4, ..Default::default() };
+        let params = openerp_core::ListParams {
+            limit: 2,
+            offset: 4,
+            ..Default::default()
+        };
         let result = ops.list_paginated(&params).unwrap();
         assert_eq!(result.items.len(), 1);
         assert!(!result.has_more);
 
         // Beyond range.
-        let params = openerp_core::ListParams { limit: 10, offset: 100, ..Default::default() };
+        let params = openerp_core::ListParams {
+            limit: 10,
+            offset: 100,
+            ..Default::default()
+        };
         let result = ops.list_paginated(&params).unwrap();
         assert_eq!(result.items.len(), 0);
         assert!(!result.has_more);
@@ -839,11 +893,36 @@ mod tests {
 
     fn seed_devices(ops: &SqlOps<Device>) {
         let devices = vec![
-            Device { sn: "D1".into(), model: 100, status: "active".into(), description: Some("Alpha".into()) },
-            Device { sn: "D2".into(), model: 100, status: "inactive".into(), description: None },
-            Device { sn: "D3".into(), model: 200, status: "active".into(), description: Some("Gamma".into()) },
-            Device { sn: "D4".into(), model: 200, status: "inactive".into(), description: None },
-            Device { sn: "D5".into(), model: 100, status: "active".into(), description: Some("Echo".into()) },
+            Device {
+                sn: "D1".into(),
+                model: 100,
+                status: "active".into(),
+                description: Some("Alpha".into()),
+            },
+            Device {
+                sn: "D2".into(),
+                model: 100,
+                status: "inactive".into(),
+                description: None,
+            },
+            Device {
+                sn: "D3".into(),
+                model: 200,
+                status: "active".into(),
+                description: Some("Gamma".into()),
+            },
+            Device {
+                sn: "D4".into(),
+                model: 200,
+                status: "inactive".into(),
+                description: None,
+            },
+            Device {
+                sn: "D5".into(),
+                model: 100,
+                status: "active".into(),
+                description: Some("Echo".into()),
+            },
         ];
         for d in devices {
             ops.save_new(d).unwrap();
@@ -867,8 +946,14 @@ mod tests {
 
         let model_field = Field::new("model", "u32", "number");
         let status_field = Field::new("status", "String", "text");
-        let results = ops.find_by_multi(&[(&model_field, "100"), (&status_field, "active")]).unwrap();
-        assert_eq!(results.len(), 2, "model=100 AND status=active should match D1, D5");
+        let results = ops
+            .find_by_multi(&[(&model_field, "100"), (&status_field, "active")])
+            .unwrap();
+        assert_eq!(
+            results.len(),
+            2,
+            "model=100 AND status=active should match D1, D5"
+        );
     }
 
     #[test]
@@ -928,7 +1013,7 @@ mod tests {
         let (ops, _dir) = make_ops();
         seed_devices(&ops);
 
-        let build_field = Field::new("model", "u32", "number");
+        let _build_field = Field::new("model", "u32", "number");
         let desc_field = Field::new("description", "Option<String>", "text");
         // model is indexed so it goes through SQL. But test the value matching
         // logic by using description (non-indexed string) + verifying numeric
@@ -947,8 +1032,14 @@ mod tests {
 
         let status_field = Field::new("status", "String", "text");
         let desc_field = Field::new("description", "Option<String>", "text");
-        let results = ops.find_by_multi(&[(&status_field, "active"), (&desc_field, "Echo")]).unwrap();
-        assert_eq!(results.len(), 1, "mixed: SQL filters status, memory filters description");
+        let results = ops
+            .find_by_multi(&[(&status_field, "active"), (&desc_field, "Echo")])
+            .unwrap();
+        assert_eq!(
+            results.len(),
+            1,
+            "mixed: SQL filters status, memory filters description"
+        );
         assert_eq!(results[0].sn, "D5");
     }
 }

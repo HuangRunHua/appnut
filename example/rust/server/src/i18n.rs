@@ -7,8 +7,6 @@
 //! Golden test: establishes the pattern. Codegen will generate
 //! localization keys from #[state] and #[request] definitions.
 
-use std::sync::Arc;
-
 /// Localizer trait — translates keys to localized strings.
 ///
 /// All user-facing error messages and UI labels go through this.

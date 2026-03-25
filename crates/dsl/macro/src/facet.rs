@@ -202,9 +202,8 @@ fn parse_facet_attrs(attr: TokenStream) -> syn::Result<FacetAttrs> {
     struct Args(Vec<syn::Meta>);
     impl syn::parse::Parse for Args {
         fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-            let p = syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated(
-                input,
-            )?;
+            let p =
+                syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated(input)?;
             Ok(Self(p.into_iter().collect()))
         }
     }
@@ -222,13 +221,12 @@ fn parse_facet_attrs(attr: TokenStream) -> syn::Result<FacetAttrs> {
                 {
                     name = Some(s.value());
                 }
-            } else if nv.path.is_ident("module") {
-                if let syn::Expr::Lit(syn::ExprLit {
+            } else if nv.path.is_ident("module")
+                && let syn::Expr::Lit(syn::ExprLit {
                     lit: Lit::Str(s), ..
                 }) = &nv.value
-                {
-                    module = Some(s.value());
-                }
+            {
+                module = Some(s.value());
             }
         }
     }
@@ -338,7 +336,7 @@ fn parse_action(t: &ItemType) -> syn::Result<ActionInfo> {
             return Err(syn::Error::new_spanned(
                 &t.ty,
                 "#[action] type must be a fn pointer: `type Name = fn(...) -> Resp;`",
-            ))
+            ));
         }
     };
 
@@ -403,7 +401,11 @@ fn emit_resource_struct(s: &ItemStruct) -> TokenStream {
     let fields = &s.fields;
 
     // Keep doc comments and pass-through attrs (not resource, not derive, not serde).
-    let doc_attrs: Vec<_> = s.attrs.iter().filter(|a| a.path().is_ident("doc")).collect();
+    let doc_attrs: Vec<_> = s
+        .attrs
+        .iter()
+        .filter(|a| a.path().is_ident("doc"))
+        .collect();
     let pass_attrs: Vec<_> = s
         .attrs
         .iter()
@@ -434,7 +436,10 @@ fn emit_resource_client_methods(
     let path_segment = res.path.trim_start_matches('/');
     let singular = match &res.singular {
         Some(s) => s.clone(),
-        None => path_segment.strip_suffix('s').unwrap_or(path_segment).to_string(),
+        None => path_segment
+            .strip_suffix('s')
+            .unwrap_or(path_segment)
+            .to_string(),
     };
     let list_fn = format_ident!("list_{}", path_segment);
     let get_fn = format_ident!("get_{}", singular);
@@ -444,7 +449,10 @@ fn emit_resource_client_methods(
     let get_path_fmt = format!("/{}/{}{}/{{}}", facet_name, facet_module, res.path);
 
     let list_doc = format!("List all {} — GET {}", path_segment, res.path);
-    let get_doc = format!("Get {} by {} — GET {}/{{{}}}", singular, res.pk, res.path, res.pk);
+    let get_doc = format!(
+        "Get {} by {} — GET {}/{{{}}}",
+        singular, res.pk, res.path, res.pk
+    );
 
     quote! {
         #[doc = #list_doc]
@@ -506,7 +514,11 @@ fn emit_action_client_method(
     let format_args: Vec<syn::Ident> = url_param_order
         .iter()
         .filter_map(|name| {
-            action.params.iter().find(|p| p.name == name).map(|p| p.name.clone())
+            action
+                .params
+                .iter()
+                .find(|p| p.name == name)
+                .map(|p| p.name.clone())
         })
         .collect();
 
@@ -543,11 +555,7 @@ fn emit_action_client_method(
         }
     };
 
-    let doc = format!(
-        "{} {}",
-        action.method,
-        action.path
-    );
+    let doc = format!("{} {}", action.method, action.path);
 
     quote! {
         #[doc = #doc]
@@ -680,18 +688,9 @@ mod tests {
 
     #[test]
     fn test_extract_path_params() {
-        assert_eq!(
-            extract_path_params("/batches/{id}/@provision"),
-            vec!["id"]
-        );
-        assert_eq!(
-            extract_path_params("/devices/{sn}/@activate"),
-            vec!["sn"]
-        );
-        assert_eq!(
-            extract_path_params("/a/{x}/b/{y}/c"),
-            vec!["x", "y"]
-        );
+        assert_eq!(extract_path_params("/batches/{id}/@provision"), vec!["id"]);
+        assert_eq!(extract_path_params("/devices/{sn}/@activate"), vec!["sn"]);
+        assert_eq!(extract_path_params("/a/{x}/b/{y}/c"), vec!["x", "y"]);
         assert!(extract_path_params("/models").is_empty());
     }
 

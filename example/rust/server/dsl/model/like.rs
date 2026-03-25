@@ -1,7 +1,7 @@
 use openerp_macro::model;
 use openerp_types::*;
 
-use super::{User, Tweet};
+use super::{Tweet, User};
 
 /// A like record (user liked a tweet). Composite key: `{user_id}:{tweet_id}`.
 #[model(module = "twitter")]

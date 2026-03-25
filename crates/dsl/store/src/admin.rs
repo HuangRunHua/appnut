@@ -10,9 +10,9 @@ use axum::extract::{Path, Query, State};
 use axum::http::HeaderMap;
 use axum::routing::get;
 use axum::{Json, Router};
-use openerp_core::{Authenticator, CountResult, ListParams, ListResult, ServiceError};
-use serde::de::DeserializeOwned;
+use openerp_core::{Authenticator, CountResult, ListParams, ServiceError};
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 use crate::kv::{KvOps, KvStore};
 use crate::sql::{SqlOps, SqlStore};
@@ -157,7 +157,8 @@ async fn update_handler<T: KvStore + DslModel + Serialize + DeserializeOwned>(
     let body_key = record.key_value();
     if body_key != id {
         return Err(ServiceError::Validation(format!(
-            "URL key '{}' does not match body key '{}'", id, body_key
+            "URL key '{}' does not match body key '{}'",
+            id, body_key
         )));
     }
     let existing = state.ops.get_or_err(&id)?;
@@ -362,7 +363,8 @@ async fn sql_update_handler<T: SqlStore + DslModel + Serialize + DeserializeOwne
     let body_pks = record.pk_values();
     if pks != body_pks {
         return Err(ServiceError::Validation(format!(
-            "URL PK {:?} does not match body PK {:?}", pks, body_pks
+            "URL PK {:?} does not match body PK {:?}",
+            pks, body_pks
         )));
     }
     let pk_refs: Vec<&str> = pks.iter().map(|s| s.as_str()).collect();
@@ -448,7 +450,7 @@ fn get_hidden_fields(ir: &serde_json::Value) -> Vec<String> {
             fields
                 .iter()
                 .filter(|f| f["widget"].as_str() == Some("hidden"))
-                .filter_map(|f| f["name"].as_str().map(|s| to_camel_case(s)))
+                .filter_map(|f| f["name"].as_str().map(to_camel_case))
                 .collect()
         })
         .unwrap_or_default()
@@ -483,13 +485,15 @@ fn merge_hidden_fields<T: Serialize + DeserializeOwned>(
     let mut new_json = serde_json::to_value(new_record)?;
     let existing_json = serde_json::to_value(existing_record)?;
 
-    if let (Some(new_obj), Some(existing_obj)) = (new_json.as_object_mut(), existing_json.as_object()) {
+    if let (Some(new_obj), Some(existing_obj)) =
+        (new_json.as_object_mut(), existing_json.as_object())
+    {
         for field in hidden_fields {
             // If new record has null for hidden field, preserve existing value
-            if new_obj.get(field).map(|v| v.is_null()).unwrap_or(true) {
-                if let Some(existing_value) = existing_obj.get(field) {
-                    new_obj.insert(field.clone(), existing_value.clone());
-                }
+            if new_obj.get(field).map(|v| v.is_null()).unwrap_or(true)
+                && let Some(existing_value) = existing_obj.get(field)
+            {
+                new_obj.insert(field.clone(), existing_value.clone());
             }
         }
     }

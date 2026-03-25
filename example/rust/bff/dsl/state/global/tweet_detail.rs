@@ -1,8 +1,8 @@
 //! Tweet detail state — stored at `tweet/{tweet_id}`.
 
+use super::timeline::FeedItem;
 use flux_derive::state;
 use serde::{Deserialize, Serialize};
-use super::timeline::FeedItem;
 
 /// Tweet detail view with replies.
 #[state("tweet")]

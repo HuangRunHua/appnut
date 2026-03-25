@@ -26,12 +26,12 @@ pub struct FileLoader;
 impl FileLoader {
     /// Load all YAML files from `data_dir` into the overlay's file layer.
     /// Returns the number of entries loaded.
-    pub fn load<DB: KVStore>(
-        data_dir: &Path,
-        overlay: &OverlayKV<DB>,
-    ) -> Result<usize, KVError> {
+    pub fn load<DB: KVStore>(data_dir: &Path, overlay: &OverlayKV<DB>) -> Result<usize, KVError> {
         if !data_dir.is_dir() {
-            debug!("FileLoader: data dir {:?} does not exist, skipping", data_dir);
+            debug!(
+                "FileLoader: data dir {:?} does not exist, skipping",
+                data_dir
+            );
             return Ok(0);
         }
 
@@ -68,8 +68,7 @@ impl FileLoader {
         overlay: &OverlayKV<DB>,
     ) -> Result<usize, KVError> {
         let mut count = 0;
-        let entries =
-            fs::read_dir(data_dir).map_err(|e| KVError::Storage(e.to_string()))?;
+        let entries = fs::read_dir(data_dir).map_err(|e| KVError::Storage(e.to_string()))?;
 
         for entry in entries {
             let entry = entry.map_err(|e| KVError::Storage(e.to_string()))?;
@@ -92,8 +91,7 @@ impl FileLoader {
                 other => format!("config:{}", other),
             };
 
-            let data =
-                fs::read(&path).map_err(|e| KVError::Storage(e.to_string()))?;
+            let data = fs::read(&path).map_err(|e| KVError::Storage(e.to_string()))?;
             overlay.insert_file_entry(key, data);
             count += 1;
         }
@@ -109,8 +107,7 @@ impl FileLoader {
         overlay: &OverlayKV<DB>,
     ) -> Result<usize, KVError> {
         let mut count = 0;
-        let entries =
-            fs::read_dir(dir).map_err(|e| KVError::Storage(e.to_string()))?;
+        let entries = fs::read_dir(dir).map_err(|e| KVError::Storage(e.to_string()))?;
 
         for entry in entries {
             let entry = entry.map_err(|e| KVError::Storage(e.to_string()))?;
@@ -125,8 +122,7 @@ impl FileLoader {
                 .unwrap_or_default();
 
             let key = format!("{}{}", prefix, stem);
-            let data =
-                fs::read(&path).map_err(|e| KVError::Storage(e.to_string()))?;
+            let data = fs::read(&path).map_err(|e| KVError::Storage(e.to_string()))?;
             overlay.insert_file_entry(key, data);
             count += 1;
         }
@@ -140,12 +136,11 @@ impl FileLoader {
         overlay: &OverlayKV<DB>,
     ) -> Result<usize, KVError> {
         let mut count = 0;
-        let dim_entries = fs::read_dir(segments_dir)
-            .map_err(|e| KVError::Storage(e.to_string()))?;
+        let dim_entries =
+            fs::read_dir(segments_dir).map_err(|e| KVError::Storage(e.to_string()))?;
 
         for dim_entry in dim_entries {
-            let dim_entry =
-                dim_entry.map_err(|e| KVError::Storage(e.to_string()))?;
+            let dim_entry = dim_entry.map_err(|e| KVError::Storage(e.to_string()))?;
             let dim_path = dim_entry.path();
             if !dim_path.is_dir() {
                 continue;
@@ -169,12 +164,11 @@ impl FileLoader {
         overlay: &OverlayKV<DB>,
     ) -> Result<usize, KVError> {
         let mut count = 0;
-        let model_entries = fs::read_dir(firmwares_dir)
-            .map_err(|e| KVError::Storage(e.to_string()))?;
+        let model_entries =
+            fs::read_dir(firmwares_dir).map_err(|e| KVError::Storage(e.to_string()))?;
 
         for model_entry in model_entries {
-            let model_entry =
-                model_entry.map_err(|e| KVError::Storage(e.to_string()))?;
+            let model_entry = model_entry.map_err(|e| KVError::Storage(e.to_string()))?;
             let model_path = model_entry.path();
             if !model_path.is_dir() {
                 continue;
@@ -188,8 +182,7 @@ impl FileLoader {
             let latest = model_path.join("latest.yaml");
             if latest.is_file() {
                 let key = format!("config:firmware:{}", model_name);
-                let data = fs::read(&latest)
-                    .map_err(|e| KVError::Storage(e.to_string()))?;
+                let data = fs::read(&latest).map_err(|e| KVError::Storage(e.to_string()))?;
                 overlay.insert_file_entry(key, data);
                 count += 1;
             } else {

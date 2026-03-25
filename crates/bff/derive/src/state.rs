@@ -33,7 +33,9 @@ pub fn expand(attr: TokenStream, item: ItemStruct) -> syn::Result<TokenStream> {
     let vis = &item.vis;
 
     // Preserve user doc comments and non-derive attributes.
-    let doc_attrs: Vec<_> = item.attrs.iter()
+    let doc_attrs: Vec<_> = item
+        .attrs
+        .iter()
         .filter(|a| a.path().is_ident("doc"))
         .collect();
 
@@ -51,10 +53,14 @@ pub fn expand(attr: TokenStream, item: ItemStruct) -> syn::Result<TokenStream> {
     }
 
     // Build derive list: user's existing + our additions.
-    let user_derive_attrs: Vec<_> = item.attrs.iter()
+    let user_derive_attrs: Vec<_> = item
+        .attrs
+        .iter()
         .filter(|a| a.path().is_ident("derive"))
         .collect();
-    let other_attrs: Vec<_> = item.attrs.iter()
+    let other_attrs: Vec<_> = item
+        .attrs
+        .iter()
         .filter(|a| !a.path().is_ident("derive") && !a.path().is_ident("doc"))
         .collect();
 
@@ -109,14 +115,14 @@ fn parse_path(attr: TokenStream) -> syn::Result<String> {
 fn collect_derives(item: &ItemStruct) -> Vec<String> {
     let mut derives = Vec::new();
     for attr in &item.attrs {
-        if attr.path().is_ident("derive") {
-            if let Ok(meta) = attr.parse_args_with(
+        if attr.path().is_ident("derive")
+            && let Ok(meta) = attr.parse_args_with(
                 syn::punctuated::Punctuated::<syn::Path, syn::Token![,]>::parse_terminated,
-            ) {
-                for path in meta {
-                    if let Some(ident) = path.get_ident() {
-                        derives.push(ident.to_string());
-                    }
+            )
+        {
+            for path in meta {
+                if let Some(ident) = path.get_ident() {
+                    derives.push(ident.to_string());
                 }
             }
         }

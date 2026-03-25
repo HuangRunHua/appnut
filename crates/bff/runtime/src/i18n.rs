@@ -185,7 +185,10 @@ mod tests {
 
     #[test]
     fn split_with_query() {
-        assert_eq!(split_url("tweet/like_count?count=3"), ("tweet/like_count", "count=3"));
+        assert_eq!(
+            split_url("tweet/like_count?count=3"),
+            ("tweet/like_count", "count=3")
+        );
     }
 
     #[test]
@@ -198,12 +201,13 @@ mod tests {
     #[test]
     fn exact_match() {
         let i18n = I18nStore::new("en");
-        i18n.handle("button/sign_in", Arc::new(|_: &str, _: &QueryParams, locale: &str| {
-            match locale {
+        i18n.handle(
+            "button/sign_in",
+            Arc::new(|_: &str, _: &QueryParams, locale: &str| match locale {
                 "zh-CN" => "登录".into(),
                 _ => "Sign In".into(),
-            }
-        }));
+            }),
+        );
 
         assert_eq!(i18n.get("button/sign_in"), "Sign In");
         i18n.set_locale("zh-CN");
@@ -221,13 +225,16 @@ mod tests {
     #[test]
     fn handler_receives_query_params() {
         let i18n = I18nStore::new("en");
-        i18n.handle("tweet/like_count", Arc::new(|_: &str, q: &QueryParams, locale: &str| {
-            let count = q.get("count").unwrap_or("0");
-            match locale {
-                "zh-CN" => format!("{} 人赞了", count),
-                _ => format!("{} likes", count),
-            }
-        }));
+        i18n.handle(
+            "tweet/like_count",
+            Arc::new(|_: &str, q: &QueryParams, locale: &str| {
+                let count = q.get("count").unwrap_or("0");
+                match locale {
+                    "zh-CN" => format!("{} 人赞了", count),
+                    _ => format!("{} likes", count),
+                }
+            }),
+        );
 
         assert_eq!(i18n.get("tweet/like_count?count=3"), "3 likes");
         i18n.set_locale("zh-CN");
@@ -237,11 +244,14 @@ mod tests {
     #[test]
     fn multiple_query_params() {
         let i18n = I18nStore::new("en");
-        i18n.handle("notification/follow", Arc::new(|_: &str, q: &QueryParams, _: &str| {
-            let follower = q.get("follower").unwrap_or("?");
-            let followee = q.get("followee").unwrap_or("?");
-            format!("{} followed {}", follower, followee)
-        }));
+        i18n.handle(
+            "notification/follow",
+            Arc::new(|_: &str, q: &QueryParams, _: &str| {
+                let follower = q.get("follower").unwrap_or("?");
+                let followee = q.get("followee").unwrap_or("?");
+                format!("{} followed {}", follower, followee)
+            }),
+        );
 
         assert_eq!(
             i18n.get("notification/follow?follower=alice&followee=bob"),
@@ -256,14 +266,17 @@ mod tests {
         let i18n = I18nStore::new("en");
 
         // Module handler for all error/* paths.
-        i18n.handle("error/#", Arc::new(|path: &str, _: &QueryParams, locale: &str| {
-            match (path, locale) {
-                ("error/tweet/empty", "zh-CN") => "推文不能为空".into(),
-                ("error/tweet/empty", _) => "Tweet cannot be empty".into(),
-                ("error/tweet/too_long", _) => "Too long".into(),
-                _ => format!("[{}]", path),
-            }
-        }));
+        i18n.handle(
+            "error/#",
+            Arc::new(
+                |path: &str, _: &QueryParams, locale: &str| match (path, locale) {
+                    ("error/tweet/empty", "zh-CN") => "推文不能为空".into(),
+                    ("error/tweet/empty", _) => "Tweet cannot be empty".into(),
+                    ("error/tweet/too_long", _) => "Too long".into(),
+                    _ => format!("[{}]", path),
+                },
+            ),
+        );
 
         assert_eq!(i18n.get("error/tweet/empty"), "Tweet cannot be empty");
         assert_eq!(i18n.get("error/tweet/too_long"), "Too long");
@@ -277,20 +290,22 @@ mod tests {
     fn multiple_module_handlers() {
         let i18n = I18nStore::new("en");
 
-        i18n.handle("auth/#", Arc::new(|path: &str, _: &QueryParams, _: &str| {
-            match path {
+        i18n.handle(
+            "auth/#",
+            Arc::new(|path: &str, _: &QueryParams, _: &str| match path {
                 "auth/login" => "Sign In".into(),
                 "auth/logout" => "Sign Out".into(),
                 _ => path.into(),
-            }
-        }));
+            }),
+        );
 
-        i18n.handle("tweet/#", Arc::new(|path: &str, _: &QueryParams, _: &str| {
-            match path {
+        i18n.handle(
+            "tweet/#",
+            Arc::new(|path: &str, _: &QueryParams, _: &str| match path {
                 "tweet/compose" => "What's happening?".into(),
                 _ => path.into(),
-            }
-        }));
+            }),
+        );
 
         assert_eq!(i18n.get("auth/login"), "Sign In");
         assert_eq!(i18n.get("tweet/compose"), "What's happening?");
@@ -369,7 +384,10 @@ mod tests {
         use std::thread;
 
         let i18n = Arc::new(I18nStore::new("en"));
-        i18n.handle("test", Arc::new(|_: &str, _: &QueryParams, _: &str| "ok".into()));
+        i18n.handle(
+            "test",
+            Arc::new(|_: &str, _: &QueryParams, _: &str| "ok".into()),
+        );
 
         let mut handles = vec![];
         for _ in 0..10 {

@@ -9,9 +9,10 @@ use flatbuffers::FlatBufferBuilder;
 // ── Format enum ─────────────────────────────────────────────────────
 
 /// Wire format for facet API responses.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Format {
     /// JSON — `application/json`. Default, human-readable.
+    #[default]
     Json,
     /// FlatBuffers — `application/x-flatbuffers`. Zero-copy binary.
     FlatBuffers,
@@ -45,12 +46,6 @@ impl Format {
         } else {
             Format::Json
         }
-    }
-}
-
-impl Default for Format {
-    fn default() -> Self {
-        Format::Json
     }
 }
 
@@ -131,10 +126,7 @@ pub fn create_string_vector<'a>(
     builder: &mut FlatBufferBuilder<'a>,
     strings: &[String],
 ) -> flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>> {
-    let offsets: Vec<_> = strings
-        .iter()
-        .map(|s| builder.create_string(s))
-        .collect();
+    let offsets: Vec<_> = strings.iter().map(|s| builder.create_string(s)).collect();
     builder.create_vector(&offsets)
 }
 

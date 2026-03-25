@@ -1,8 +1,8 @@
 //! Timeline state — stored at `timeline/feed`.
 
+use super::auth::UserProfile;
 use flux_derive::state;
 use serde::{Deserialize, Serialize};
-use super::auth::UserProfile;
 
 /// Home timeline feed.
 #[state("timeline/feed")]

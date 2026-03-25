@@ -38,7 +38,7 @@ mod util;
 pub fn model(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item = parse_macro_input!(item as syn::ItemStruct);
     model::expand(attr.into(), item)
-        .unwrap_or_else(|e| e.to_compile_error().into())
+        .unwrap_or_else(|e| e.to_compile_error())
         .into()
 }
 
@@ -64,7 +64,7 @@ pub fn model(attr: TokenStream, item: TokenStream) -> TokenStream {
 pub fn dsl_enum(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item = parse_macro_input!(item as syn::ItemEnum);
     enum_impl::expand(attr.into(), item)
-        .unwrap_or_else(|e| e.to_compile_error().into())
+        .unwrap_or_else(|e| e.to_compile_error())
         .into()
 }
 
@@ -95,7 +95,7 @@ pub fn dsl_enum(attr: TokenStream, item: TokenStream) -> TokenStream {
 pub fn facet(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item = parse_macro_input!(item as syn::ItemMod);
     facet::expand(attr.into(), item)
-        .unwrap_or_else(|e| e.to_compile_error().into())
+        .unwrap_or_else(|e| e.to_compile_error())
         .into()
 }
 
@@ -119,6 +119,6 @@ pub fn facet(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn impl_handler(input: TokenStream) -> TokenStream {
     handler::expand(input.into())
-        .unwrap_or_else(|e| e.to_compile_error().into())
+        .unwrap_or_else(|e| e.to_compile_error())
         .into()
 }

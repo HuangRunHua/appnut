@@ -10,15 +10,15 @@ pub mod model;
 #[path = "../dsl/rest/app.rs"]
 pub mod rest_app;
 
-pub mod store_impls;
-pub mod jwt;
-pub mod i18n;
 pub mod facet_handlers;
+pub mod i18n;
+pub mod jwt;
+pub mod store_impls;
 
 use std::sync::Arc;
 
 use axum::Router;
-use openerp_store::{admin_kv_router, HierarchyNode, KvOps, ModuleDef, ResourceDef};
+use openerp_store::{HierarchyNode, KvOps, ModuleDef, ResourceDef, admin_kv_router};
 use openerp_types::DslModel;
 
 use model::*;
@@ -38,24 +38,39 @@ pub fn admin_router(
     let mut router = Router::new();
 
     router = router.merge(admin_kv_router(
-        KvOps::<User>::new(kv.clone()), auth.clone(),
-        "twitter", "users", "user",
+        KvOps::<User>::new(kv.clone()),
+        auth.clone(),
+        "twitter",
+        "users",
+        "user",
     ));
     router = router.merge(admin_kv_router(
-        KvOps::<Tweet>::new(kv.clone()), auth.clone(),
-        "twitter", "tweets", "tweet",
+        KvOps::<Tweet>::new(kv.clone()),
+        auth.clone(),
+        "twitter",
+        "tweets",
+        "tweet",
     ));
     router = router.merge(admin_kv_router(
-        KvOps::<Like>::new(kv.clone()), auth.clone(),
-        "twitter", "likes", "like",
+        KvOps::<Like>::new(kv.clone()),
+        auth.clone(),
+        "twitter",
+        "likes",
+        "like",
     ));
     router = router.merge(admin_kv_router(
-        KvOps::<Follow>::new(kv.clone()), auth.clone(),
-        "twitter", "follows", "follow",
+        KvOps::<Follow>::new(kv.clone()),
+        auth.clone(),
+        "twitter",
+        "follows",
+        "follow",
     ));
     router = router.merge(admin_kv_router(
-        KvOps::<Message>::new(kv.clone()), auth.clone(),
-        "twitter", "messages", "message",
+        KvOps::<Message>::new(kv.clone()),
+        auth.clone(),
+        "twitter",
+        "messages",
+        "message",
     ));
 
     router
@@ -68,14 +83,10 @@ pub fn schema_def() -> ModuleDef {
         label: "Twitter",
         icon: "message-circle",
         resources: vec![
-            ResourceDef::from_ir("twitter", User::__dsl_ir())
-                .with_desc("User accounts"),
-            ResourceDef::from_ir("twitter", Tweet::__dsl_ir())
-                .with_desc("Tweets (posts)"),
-            ResourceDef::from_ir("twitter", Like::__dsl_ir())
-                .with_desc("Like records"),
-            ResourceDef::from_ir("twitter", Follow::__dsl_ir())
-                .with_desc("Follow relationships"),
+            ResourceDef::from_ir("twitter", User::__dsl_ir()).with_desc("User accounts"),
+            ResourceDef::from_ir("twitter", Tweet::__dsl_ir()).with_desc("Tweets (posts)"),
+            ResourceDef::from_ir("twitter", Like::__dsl_ir()).with_desc("Like records"),
+            ResourceDef::from_ir("twitter", Follow::__dsl_ir()).with_desc("Follow relationships"),
             ResourceDef::from_ir("twitter", Message::__dsl_ir())
                 .with_desc("In-app messages (站内信)"),
         ],
@@ -92,18 +103,24 @@ fn hierarchy() -> Vec<HierarchyNode> {
             label: "Users",
             icon: "users",
             description: "User accounts",
-            children: vec![
-                HierarchyNode::leaf("follow", "Follows", "user-plus", "Follow relationships"),
-            ],
+            children: vec![HierarchyNode::leaf(
+                "follow",
+                "Follows",
+                "user-plus",
+                "Follow relationships",
+            )],
         },
         HierarchyNode {
             resource: "tweet",
             label: "Tweets",
             icon: "message-circle",
             description: "Tweets (posts)",
-            children: vec![
-                HierarchyNode::leaf("like", "Likes", "heart", "Like records"),
-            ],
+            children: vec![HierarchyNode::leaf(
+                "like",
+                "Likes",
+                "heart",
+                "Like records",
+            )],
         },
         HierarchyNode::leaf("message", "Messages", "mail", "In-app messages"),
     ]

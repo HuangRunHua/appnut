@@ -32,9 +32,7 @@ impl RedbStore {
             .commit()
             .map_err(|e| KVError::Storage(e.to_string()))?;
 
-        Ok(Self {
-            db: Arc::new(db),
-        })
+        Ok(Self { db: Arc::new(db) })
     }
 }
 

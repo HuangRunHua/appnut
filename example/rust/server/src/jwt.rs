@@ -59,8 +59,12 @@ impl JwtService {
             iat: now,
             exp: now + self.expire_secs,
         };
-        jsonwebtoken::encode(&jsonwebtoken::Header::default(), &claims, &self.encoding_key)
-            .map_err(|e| format!("jwt encode: {}", e))
+        jsonwebtoken::encode(
+            &jsonwebtoken::Header::default(),
+            &claims,
+            &self.encoding_key,
+        )
+        .map_err(|e| format!("jwt encode: {}", e))
     }
 
     /// Verify a JWT and extract claims.

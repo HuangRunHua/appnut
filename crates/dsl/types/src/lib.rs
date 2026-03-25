@@ -27,11 +27,11 @@
 pub mod format;
 
 pub use format::{
-    create_string_vector, vt_offset, FlatBufferDecodeError, Format, FromFlatBuffer,
-    FromFlatBufferList, IntoFlatBuffer, IntoFlatBufferList, MIME_FLATBUFFERS, MIME_JSON,
+    FlatBufferDecodeError, Format, FromFlatBuffer, FromFlatBufferList, IntoFlatBuffer,
+    IntoFlatBufferList, MIME_FLATBUFFERS, MIME_JSON, create_string_vector, vt_offset,
 };
 
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::fmt;
 use std::marker::PhantomData;
 use std::ops::Deref;
@@ -89,7 +89,15 @@ pub trait DslModel: Serialize + DeserializeOwned + Clone + Send + Sync + 'static
 /// the enum belongs to.  Serialized as SCREAMING_SNAKE_CASE strings so
 /// existing KV data (`"DRAFT"`, `"IN_PROGRESS"`) stays compatible.
 pub trait DslEnum:
-    Serialize + DeserializeOwned + Clone + Send + Sync + fmt::Display + std::str::FromStr + Default + 'static
+    Serialize
+    + DeserializeOwned
+    + Clone
+    + Send
+    + Sync
+    + fmt::Display
+    + std::str::FromStr
+    + Default
+    + 'static
 {
     /// Module this enum belongs to (e.g. "pms", "task").
     fn module() -> &'static str;
@@ -309,7 +317,7 @@ impl fmt::Display for Field {
 }
 
 /// Map a type name to a UI widget string. Used by the `#[model]` macro.
-pub const fn widget_for_type(ty: &str) -> &str {
+pub const fn widget_for_type(_ty: &str) -> &str {
     // const fn can't do string matching in stable Rust, so the macro
     // will call a non-const helper. This is a placeholder.
     "text"
@@ -318,16 +326,39 @@ pub const fn widget_for_type(ty: &str) -> &str {
 /// Known DSL builtin type names — anything not in this set that starts
 /// with an uppercase letter is assumed to be a `#[dsl_enum]` → `"select"`.
 ///
-/// **Must stay in sync with `openerp_macro::model::BUILTIN_TYPES`.**
+/// **Must stay in sync with `openerp_macro::model::_BUILTIN_TYPES`.**
 /// Duplicated here because proc-macro crates cannot depend on runtime crates.
-const BUILTIN_TYPES: &[&str] = &[
-    "Id", "Email", "Phone", "Url", "Avatar", "ImageUrl",
-    "Password", "PasswordHash", "Secret",
-    "Text", "Markdown", "Code",
-    "DateTime", "Date", "Color", "SemVer",
+const _BUILTIN_TYPES: &[&str] = &[
+    "Id",
+    "Email",
+    "Phone",
+    "Url",
+    "Avatar",
+    "ImageUrl",
+    "Password",
+    "PasswordHash",
+    "Secret",
+    "Text",
+    "Markdown",
+    "Code",
+    "DateTime",
+    "Date",
+    "Color",
+    "SemVer",
     "Name",
-    "String", "bool", "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64",
-    "f32", "f64", "Vec",
+    "String",
+    "bool",
+    "u8",
+    "u16",
+    "u32",
+    "u64",
+    "i8",
+    "i16",
+    "i32",
+    "i64",
+    "f32",
+    "f64",
+    "Vec",
 ];
 
 /// Non-const widget inference from type name.
@@ -354,9 +385,15 @@ pub fn infer_widget(ty_name: &str, field_name: &str) -> &'static str {
         "bool" => "switch",
         "Vec" => "tags",
         _ => {
-            if field_name.ends_with("_at") { return "datetime"; }
-            if field_name == "description" || field_name == "notes" { return "textarea"; }
-            if is_enum_type(ty_name) { return "select"; }
+            if field_name.ends_with("_at") {
+                return "datetime";
+            }
+            if field_name == "description" || field_name == "notes" {
+                return "textarea";
+            }
+            if is_enum_type(ty_name) {
+                return "select";
+            }
             "text"
         }
     }
@@ -365,8 +402,14 @@ pub fn infer_widget(ty_name: &str, field_name: &str) -> &'static str {
 /// Known #[dsl_enum] types in the codebase.
 /// These are manually maintained — when adding a new #[dsl_enum], update this list.
 const KNOWN_DSL_ENUMS: &[&str] = &[
-    "TaskStatus", "TaskPriority", "BatchStatus", "ProvisionStatus",
-    "DeviceStatus", "Priority", "Status", "ItemStatus",
+    "TaskStatus",
+    "TaskPriority",
+    "BatchStatus",
+    "ProvisionStatus",
+    "DeviceStatus",
+    "Priority",
+    "Status",
+    "ItemStatus",
 ];
 
 /// Check if a type is a known #[dsl_enum] type.
@@ -585,10 +628,10 @@ impl LocalizedText {
             return s;
         }
         // Fallback: try base language (e.g. "zh-CN" → "zh").
-        if let Some(dash) = locale.find('-') {
-            if let Some(s) = self.0.get(&locale[..dash]) {
-                return s;
-            }
+        if let Some(dash) = locale.find('-')
+            && let Some(s) = self.0.get(&locale[..dash])
+        {
+            return s;
         }
         // Fallback to English.
         if let Some(s) = self.0.get("en") {
@@ -667,19 +710,19 @@ pub const fn const_str_eq(a: &str, b: &str) -> bool {
 ///   policy → policies, batch → batches, device → devices,
 ///   relay → relays, user → users, bus → buses
 pub fn pluralize(s: &str) -> String {
-    if s.ends_with('y') {
-        // Consonant + y → ies (policy → policies)
-        // Vowel + y → ys (relay → relays, day → days)
-        let chars: Vec<char> = s.chars().collect();
-        if chars.len() >= 2 {
-            let before_y = chars[chars.len() - 2];
-            if !"aeiou".contains(before_y) {
-                return format!("{}ies", &s[..s.len() - 1]);
-            }
+    if let Some(stripped) = s.strip_suffix('y') {
+        let chars: Vec<char> = stripped.chars().collect();
+        if let Some(&before_y) = chars.last()
+            && !"aeiou".contains(before_y)
+        {
+            return format!("{stripped}ies");
         }
         format!("{}s", s)
-    } else if s.ends_with('s') || s.ends_with('x') || s.ends_with('z')
-        || s.ends_with("sh") || s.ends_with("ch")
+    } else if s.ends_with('s')
+        || s.ends_with('x')
+        || s.ends_with('z')
+        || s.ends_with("sh")
+        || s.ends_with("ch")
     {
         format!("{}es", s)
     } else {
@@ -789,13 +832,22 @@ mod tests {
         assert!(!slash_only.validate(), "bare slash should fail");
 
         let leading_slash: Name<()> = Name::new("/trailing");
-        assert!(!leading_slash.validate(), "leading slash with nothing before should fail");
+        assert!(
+            !leading_slash.validate(),
+            "leading slash with nothing before should fail"
+        );
 
         let trailing_slash: Name<()> = Name::new("trailing/");
-        assert!(!trailing_slash.validate(), "trailing slash with nothing after should fail");
+        assert!(
+            !trailing_slash.validate(),
+            "trailing slash with nothing after should fail"
+        );
 
         let multi_trailing: Name<()> = Name::new("auth/users/");
-        assert!(!multi_trailing.validate(), "multi-segment with empty last segment should fail");
+        assert!(
+            !multi_trailing.validate(),
+            "multi-segment with empty last segment should fail"
+        );
     }
 
     #[test]
@@ -892,16 +944,26 @@ mod tests {
     fn is_enum_type_rejects_custom_struct_names() {
         // Custom struct names that start uppercase but are NOT #[dsl_enum].
         // These should return false — they're structs, not enums.
-        assert!(!super::is_enum_type("ExternalInfo"),
-            "ExternalInfo is a struct, not a dsl_enum — should not be treated as enum");
-        assert!(!super::is_enum_type("ProvisionRequest"),
-            "ProvisionRequest is a struct, not a dsl_enum — should not be treated as enum");
-        assert!(!super::is_enum_type("LocalizedText"),
-            "LocalizedText is a struct defined in this crate — should not be treated as enum");
-        assert!(!super::is_enum_type("HashMap"),
-            "HashMap is a std type — should not be treated as enum");
-        assert!(!super::is_enum_type("CustomConfig"),
-            "CustomConfig is a struct — should not be treated as enum");
+        assert!(
+            !super::is_enum_type("ExternalInfo"),
+            "ExternalInfo is a struct, not a dsl_enum — should not be treated as enum"
+        );
+        assert!(
+            !super::is_enum_type("ProvisionRequest"),
+            "ProvisionRequest is a struct, not a dsl_enum — should not be treated as enum"
+        );
+        assert!(
+            !super::is_enum_type("LocalizedText"),
+            "LocalizedText is a struct defined in this crate — should not be treated as enum"
+        );
+        assert!(
+            !super::is_enum_type("HashMap"),
+            "HashMap is a std type — should not be treated as enum"
+        );
+        assert!(
+            !super::is_enum_type("CustomConfig"),
+            "CustomConfig is a struct — should not be treated as enum"
+        );
     }
 
     #[test]
@@ -930,12 +992,21 @@ mod tests {
     fn infer_widget_custom_struct_not_select() {
         // A field with a custom struct type should NOT get widget "select".
         // "select" should be reserved for actual #[dsl_enum] types.
-        assert_ne!(super::infer_widget("ExternalInfo", "info"), "select",
-            "ExternalInfo is a struct — widget should not be select");
-        assert_ne!(super::infer_widget("ProvisionRequest", "request"), "select",
-            "ProvisionRequest is a struct — widget should not be select");
-        assert_ne!(super::infer_widget("CustomConfig", "config"), "select",
-            "CustomConfig is a struct — widget should not be select");
+        assert_ne!(
+            super::infer_widget("ExternalInfo", "info"),
+            "select",
+            "ExternalInfo is a struct — widget should not be select"
+        );
+        assert_ne!(
+            super::infer_widget("ProvisionRequest", "request"),
+            "select",
+            "ProvisionRequest is a struct — widget should not be select"
+        );
+        assert_ne!(
+            super::infer_widget("CustomConfig", "config"),
+            "select",
+            "CustomConfig is a struct — widget should not be select"
+        );
     }
 
     #[test]

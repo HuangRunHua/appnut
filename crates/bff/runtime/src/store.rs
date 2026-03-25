@@ -291,7 +291,10 @@ mod tests {
         store.remove("counter");
         store.set("counter", 2u32);
 
-        assert_eq!(store.get("counter").unwrap().downcast_ref::<u32>(), Some(&2));
+        assert_eq!(
+            store.get("counter").unwrap().downcast_ref::<u32>(),
+            Some(&2)
+        );
     }
 
     // ========================================================================

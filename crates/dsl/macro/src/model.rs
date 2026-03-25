@@ -1,19 +1,26 @@
 //! `#[model]` macro expansion.
 
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote, ToTokens};
+use quote::{ToTokens, format_ident, quote};
 use syn::{Fields, ItemStruct, Lit};
 
 pub fn expand(attr: TokenStream, item: ItemStruct) -> syn::Result<TokenStream> {
     // Parse module name and optional name template from attr.
-    let ModelAttrs { module, name_template } = parse_model_attrs(attr)?;
+    let ModelAttrs {
+        module,
+        name_template,
+    } = parse_model_attrs(attr)?;
 
     let struct_name = &item.ident;
     let struct_name_str = struct_name.to_string();
     let vis = &item.vis;
 
     // Collect doc attrs.
-    let doc_attrs: Vec<_> = item.attrs.iter().filter(|a| a.path().is_ident("doc")).collect();
+    let doc_attrs: Vec<_> = item
+        .attrs
+        .iter()
+        .filter(|a| a.path().is_ident("doc"))
+        .collect();
 
     // Collect non-DSL attrs to pass through.
     let pass_attrs: Vec<_> = item
@@ -25,7 +32,12 @@ pub fn expand(attr: TokenStream, item: ItemStruct) -> syn::Result<TokenStream> {
     // Parse fields.
     let named = match &item.fields {
         Fields::Named(n) => n,
-        _ => return Err(syn::Error::new_spanned(&item.ident, "model must have named fields")),
+        _ => {
+            return Err(syn::Error::new_spanned(
+                &item.ident,
+                "model must have named fields",
+            ));
+        }
     };
 
     // ── id / name mutual exclusion check ──
@@ -43,10 +55,10 @@ pub fn expand(attr: TokenStream, item: ItemStruct) -> syn::Result<TokenStream> {
     //   - `id: Id` + `name = ".../{sn}"` → conflicting identity
     if let Some(ref tmpl) = name_template {
         let (_, key_field) = parse_name_template(tmpl)?;
-        let has_id_field = named.named.iter().any(|f| {
-            f.ident.as_ref().map(|i| i == "id").unwrap_or(false)
-                && is_type_id(&f.ty)
-        });
+        let has_id_field = named
+            .named
+            .iter()
+            .any(|f| f.ident.as_ref().map(|i| i == "id").unwrap_or(false) && is_type_id(&f.ty));
         if has_id_field && key_field != "id" {
             return Err(syn::Error::new_spanned(
                 &item.ident,
@@ -165,10 +177,13 @@ pub fn expand(attr: TokenStream, item: ItemStruct) -> syn::Result<TokenStream> {
         let is_known_enum = KNOWN_DSL_ENUMS.contains(&inner_ty.as_str());
 
         if let Some(ref targets) = name_ref_targets {
-            let targets_json: Vec<_> = targets.iter().map(|t| {
-                let snake = to_snake_case(t);
-                quote! { serde_json::json!({ "type": #t, "resource": #snake }) }
-            }).collect();
+            let targets_json: Vec<_> = targets
+                .iter()
+                .map(|t| {
+                    let snake = to_snake_case(t);
+                    quote! { serde_json::json!({ "type": #t, "resource": #snake }) }
+                })
+                .collect();
             field_ir_entries.push(quote! {
                 {
                     let mut __entry = serde_json::json!({
@@ -305,9 +320,7 @@ fn parse_model_attrs(attr: TokenStream) -> syn::Result<ModelAttrs> {
     impl syn::parse::Parse for AttrArgs {
         fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
             let parsed =
-                syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated(
-                    input,
-                )?;
+                syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated(input)?;
             Ok(Self(parsed.into_iter().collect()))
         }
     }
@@ -325,13 +338,12 @@ fn parse_model_attrs(attr: TokenStream) -> syn::Result<ModelAttrs> {
                 {
                     module = Some(s.value());
                 }
-            } else if nv.path.is_ident("name") {
-                if let syn::Expr::Lit(syn::ExprLit {
+            } else if nv.path.is_ident("name")
+                && let syn::Expr::Lit(syn::ExprLit {
                     lit: Lit::Str(s), ..
                 }) = &nv.value
-                {
-                    name_template = Some(s.value());
-                }
+            {
+                name_template = Some(s.value());
             }
         }
     }
@@ -343,7 +355,10 @@ fn parse_model_attrs(attr: TokenStream) -> syn::Result<ModelAttrs> {
         )
     })?;
 
-    Ok(ModelAttrs { module, name_template })
+    Ok(ModelAttrs {
+        module,
+        name_template,
+    })
 }
 
 /// Parse a name template like `"auth/users/{id}"` into prefix `"auth/users/"` and key field `"id"`.
@@ -383,32 +398,31 @@ enum NameFieldKind {
 
 /// Classify whether a field type is Name<T>, Option<Name<T>>, or neither.
 fn classify_name_field(ty: &syn::Type) -> NameFieldKind {
-    if let syn::Type::Path(tp) = ty {
-        if let Some(seg) = tp.path.segments.last() {
-            let name = seg.ident.to_string();
-            if name == "Option" {
-                if let syn::PathArguments::AngleBracketed(args) = &seg.arguments {
-                    if let Some(syn::GenericArgument::Type(inner)) = args.args.first() {
-                        if is_name_type(inner) {
-                            return NameFieldKind::Option;
-                        }
-                    }
-                }
-                return NameFieldKind::NotName;
+    if let syn::Type::Path(tp) = ty
+        && let Some(seg) = tp.path.segments.last()
+    {
+        let name = seg.ident.to_string();
+        if name == "Option" {
+            if let syn::PathArguments::AngleBracketed(args) = &seg.arguments
+                && let Some(syn::GenericArgument::Type(inner)) = args.args.first()
+                && is_name_type(inner)
+            {
+                return NameFieldKind::Option;
             }
-            if name == "Name" {
-                return NameFieldKind::Direct;
-            }
+            return NameFieldKind::NotName;
+        }
+        if name == "Name" {
+            return NameFieldKind::Direct;
         }
     }
     NameFieldKind::NotName
 }
 
 fn is_name_type(ty: &syn::Type) -> bool {
-    if let syn::Type::Path(tp) = ty {
-        if let Some(seg) = tp.path.segments.last() {
-            return seg.ident == "Name";
-        }
+    if let syn::Type::Path(tp) = ty
+        && let Some(seg) = tp.path.segments.last()
+    {
+        return seg.ident == "Name";
     }
     false
 }
@@ -422,24 +436,23 @@ fn is_name_type(ty: &syn::Type) -> bool {
 ///
 /// Also handles `Option<Name<T>>`.
 fn extract_name_ref_targets(ty: &syn::Type) -> Option<Vec<String>> {
-    if let syn::Type::Path(tp) = ty {
-        if let Some(seg) = tp.path.segments.last() {
-            let name = seg.ident.to_string();
-            if name == "Option" {
-                if let syn::PathArguments::AngleBracketed(args) = &seg.arguments {
-                    if let Some(syn::GenericArgument::Type(inner)) = args.args.first() {
-                        return extract_name_ref_targets(inner);
-                    }
-                }
+    if let syn::Type::Path(tp) = ty
+        && let Some(seg) = tp.path.segments.last()
+    {
+        let name = seg.ident.to_string();
+        if name == "Option"
+            && let syn::PathArguments::AngleBracketed(args) = &seg.arguments
+            && let Some(syn::GenericArgument::Type(inner)) = args.args.first()
+        {
+            return extract_name_ref_targets(inner);
+        }
+        if name == "Name" {
+            if let syn::PathArguments::AngleBracketed(args) = &seg.arguments
+                && let Some(syn::GenericArgument::Type(inner)) = args.args.first()
+            {
+                return Some(extract_tuple_type_names(inner));
             }
-            if name == "Name" {
-                if let syn::PathArguments::AngleBracketed(args) = &seg.arguments {
-                    if let Some(syn::GenericArgument::Type(inner)) = args.args.first() {
-                        return Some(extract_tuple_type_names(inner));
-                    }
-                }
-                return Some(vec![]);
-            }
+            return Some(vec![]);
         }
     }
     None
@@ -449,28 +462,32 @@ fn extract_name_ref_targets(ty: &syn::Type) -> Option<Vec<String>> {
 /// `User` → `["User"]`, `(User, Device)` → `["User", "Device"]`, `()` → `[]`.
 fn extract_tuple_type_names(ty: &syn::Type) -> Vec<String> {
     if let syn::Type::Tuple(tuple) = ty {
-        return tuple.elems.iter().filter_map(|t| {
-            if let syn::Type::Path(tp) = t {
-                tp.path.segments.last().map(|s| s.ident.to_string())
-            } else {
-                None
-            }
-        }).collect();
+        return tuple
+            .elems
+            .iter()
+            .filter_map(|t| {
+                if let syn::Type::Path(tp) = t {
+                    tp.path.segments.last().map(|s| s.ident.to_string())
+                } else {
+                    None
+                }
+            })
+            .collect();
     }
-    if let syn::Type::Path(tp) = ty {
-        if let Some(seg) = tp.path.segments.last() {
-            return vec![seg.ident.to_string()];
-        }
+    if let syn::Type::Path(tp) = ty
+        && let Some(seg) = tp.path.segments.last()
+    {
+        return vec![seg.ident.to_string()];
     }
     vec![]
 }
 
 /// Check if a field type is `Id` (the identity newtype).
 fn is_type_id(ty: &syn::Type) -> bool {
-    if let syn::Type::Path(tp) = ty {
-        if let Some(seg) = tp.path.segments.last() {
-            return seg.ident == "Id";
-        }
+    if let syn::Type::Path(tp) = ty
+        && let Some(seg) = tp.path.segments.last()
+    {
+        return seg.ident == "Id";
     }
     false
 }
@@ -483,18 +500,17 @@ fn type_to_string(ty: &syn::Type) -> String {
 /// Extract the innermost meaningful type name for widget inference.
 /// Option<Email> -> "Email", Vec<String> -> "Vec<String>", String -> "String"
 fn extract_inner_type_name(ty: &syn::Type) -> String {
-    if let syn::Type::Path(tp) = ty {
-        if let Some(seg) = tp.path.segments.last() {
-            let name = seg.ident.to_string();
-            if name == "Option" {
-                if let syn::PathArguments::AngleBracketed(args) = &seg.arguments {
-                    if let Some(syn::GenericArgument::Type(inner)) = args.args.first() {
-                        return extract_inner_type_name(inner);
-                    }
-                }
-            }
-            return name;
+    if let syn::Type::Path(tp) = ty
+        && let Some(seg) = tp.path.segments.last()
+    {
+        let name = seg.ident.to_string();
+        if name == "Option"
+            && let syn::PathArguments::AngleBracketed(args) = &seg.arguments
+            && let Some(syn::GenericArgument::Type(inner)) = args.args.first()
+        {
+            return extract_inner_type_name(inner);
         }
+        return name;
     }
     "String".to_string()
 }
@@ -526,16 +542,39 @@ fn extract_ui_widget(attrs: &[syn::Attribute]) -> syn::Result<Option<String>> {
 /// with an uppercase letter is assumed to be a `#[dsl_enum]` and gets
 /// the `"select"` widget.
 ///
-/// **Must stay in sync with `openerp_types::BUILTIN_TYPES`.**
+/// **Must stay in sync with `openerp_types::_BUILTIN_TYPES`.**
 /// Duplicated here because proc-macro crates cannot depend on runtime crates.
-const BUILTIN_TYPES: &[&str] = &[
-    "Id", "Email", "Phone", "Url", "Avatar", "ImageUrl",
-    "Password", "PasswordHash", "Secret",
-    "Text", "Markdown", "Code",
-    "DateTime", "Date", "Color", "SemVer",
+const _BUILTIN_TYPES: &[&str] = &[
+    "Id",
+    "Email",
+    "Phone",
+    "Url",
+    "Avatar",
+    "ImageUrl",
+    "Password",
+    "PasswordHash",
+    "Secret",
+    "Text",
+    "Markdown",
+    "Code",
+    "DateTime",
+    "Date",
+    "Color",
+    "SemVer",
     "Name",
-    "String", "bool", "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64",
-    "f32", "f64", "Vec",
+    "String",
+    "bool",
+    "u8",
+    "u16",
+    "u32",
+    "u64",
+    "i8",
+    "i16",
+    "i32",
+    "i64",
+    "f32",
+    "f64",
+    "Vec",
 ];
 
 fn infer_widget(ty_name: &str, field_name: &str) -> &'static str {
@@ -574,8 +613,14 @@ fn infer_widget(ty_name: &str, field_name: &str) -> &'static str {
 /// Known #[dsl_enum] types in the codebase.
 /// These are manually maintained — when adding a new #[dsl_enum], update this list.
 const KNOWN_DSL_ENUMS: &[&str] = &[
-    "TaskStatus", "TaskPriority", "BatchStatus", "ProvisionStatus",
-    "DeviceStatus", "Priority", "Status", "ItemStatus",
+    "TaskStatus",
+    "TaskPriority",
+    "BatchStatus",
+    "ProvisionStatus",
+    "DeviceStatus",
+    "Priority",
+    "Status",
+    "ItemStatus",
 ];
 
 /// Check if a type is a known #[dsl_enum] type.
@@ -593,18 +638,19 @@ fn to_snake_case(s: &str) -> String {
 /// Duplicated here because proc-macro crates cannot depend on runtime crates.
 /// The canonical version with tests lives in `openerp_types`.
 fn pluralize(s: &str) -> String {
-    if s.ends_with('y') {
-        // Check if preceded by a consonant: policy -> policies
-        let chars: Vec<char> = s.chars().collect();
-        if chars.len() >= 2 {
-            let before_y = chars[chars.len() - 2];
-            if !"aeiou".contains(before_y) {
-                return format!("{}ies", &s[..s.len() - 1]);
-            }
+    if let Some(stripped) = s.strip_suffix('y') {
+        let chars: Vec<char> = stripped.chars().collect();
+        if let Some(&before_y) = chars.last()
+            && !"aeiou".contains(before_y)
+        {
+            return format!("{stripped}ies");
         }
         format!("{}s", s)
-    } else if s.ends_with('s') || s.ends_with('x') || s.ends_with('z')
-        || s.ends_with("sh") || s.ends_with("ch")
+    } else if s.ends_with('s')
+        || s.ends_with('x')
+        || s.ends_with('z')
+        || s.ends_with("sh")
+        || s.ends_with("ch")
     {
         format!("{}es", s)
     } else {

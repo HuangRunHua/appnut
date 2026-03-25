@@ -149,7 +149,9 @@ pub mod app {
         #[serde(default)]
         pub offset: usize,
     }
-    fn default_limit() -> usize { 20 }
+    fn default_limit() -> usize {
+        20
+    }
 
     /// Get my timeline (paginated).
     #[action(method = "POST", path = "/timeline")]

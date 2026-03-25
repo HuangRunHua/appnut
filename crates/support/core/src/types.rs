@@ -73,10 +73,7 @@ pub fn now_rfc3339() -> String {
 /// - Otherwise, the key is set to the patch value.
 ///
 /// This follows RFC 7386 (JSON Merge Patch) semantics.
-pub fn merge_patch(
-    base: &mut serde_json::Value,
-    patch: &serde_json::Value,
-) {
+pub fn merge_patch(base: &mut serde_json::Value, patch: &serde_json::Value) {
     if let (Some(base_obj), Some(patch_obj)) = (base.as_object_mut(), patch.as_object()) {
         for (key, value) in patch_obj {
             if value.is_null() {

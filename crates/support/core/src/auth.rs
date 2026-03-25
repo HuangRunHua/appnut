@@ -19,11 +19,7 @@ pub trait Authenticator: Send + Sync + 'static {
     /// - `headers`: the HTTP request headers
     /// - `permission`: the string from `#[permission("module:resource:action")]`
     /// - Returns `Ok(())` if allowed, `Err(ServiceError)` if denied.
-    fn check(
-        &self,
-        headers: &HeaderMap,
-        permission: &str,
-    ) -> Result<(), ServiceError>;
+    fn check(&self, headers: &HeaderMap, permission: &str) -> Result<(), ServiceError>;
 }
 
 /// A no-op authenticator that allows everything. Used for testing

@@ -39,6 +39,7 @@ macro_rules! widget {
 
 #[cfg(test)]
 mod tests {
+    #[allow(unused_imports)]
     use super::super::*;
 
     #[test]
