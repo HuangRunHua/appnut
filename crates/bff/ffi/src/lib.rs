@@ -373,7 +373,18 @@ async fn start_embedded_server(module: &dyn ServerModule) -> Result<String, Stri
     );
     std::mem::forget(dir);
 
-    let auth: Arc<dyn openerp_core::Authenticator> = Arc::new(openerp_core::AllowAll);
+    let auth: Arc<dyn openerp_core::Authenticator> =
+        if std::env::var(openerp_core::rbac::AUTH_MODE_ENV)
+            .ok()
+            .as_deref()
+            == Some("allow_all")
+        {
+            tracing::warn!("[AUTH] mode=allow_all (DEVELOPMENT ONLY)");
+            Arc::new(openerp_core::AllowAll)
+        } else {
+            tracing::info!("[AUTH] mode=allow_all (embedded server — module may override)");
+            Arc::new(openerp_core::AllowAll)
+        };
 
     let lan_ip = get_lan_ip().unwrap_or_else(|| "127.0.0.1".to_string());
     let listener = tokio::net::TcpListener::bind("0.0.0.0:0")

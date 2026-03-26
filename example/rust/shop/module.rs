@@ -71,7 +71,12 @@ impl ServerModule for ShopModule {
     }
 
     fn admin_router(&self, ctx: &ServerContext) -> axum::Router {
-        server::admin_router(ctx.kv.clone(), ctx.auth.clone())
+        let rbac = openerp_core::RbacAuthenticator::new(
+            server::jwt::SHOP_TEST_SECRET,
+            server::roles::shop_permission_map(),
+        );
+        let auth = openerp_core::resolve_auth_mode(rbac);
+        server::admin_router(ctx.kv.clone(), auth)
     }
 
     fn seed_data(&self, ctx: &ServerContext) {

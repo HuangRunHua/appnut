@@ -29,7 +29,11 @@ async fn main() -> anyhow::Result<()> {
     seed_data(&kv);
     info!("Seeded test data");
 
-    let auth: Arc<dyn openerp_core::Authenticator> = Arc::new(openerp_core::AllowAll);
+    let rbac = openerp_core::RbacAuthenticator::new(
+        flux_shop::server::jwt::SHOP_TEST_SECRET,
+        flux_shop::server::roles::shop_permission_map(),
+    );
+    let auth: Arc<dyn openerp_core::Authenticator> = openerp_core::resolve_auth_mode(rbac);
     let schema_json =
         openerp_store::build_schema("ShopFlux", vec![flux_shop::server::schema_def()]);
 
@@ -97,29 +101,19 @@ struct LoginReq {
 }
 
 async fn login_handler(Json(body): Json<LoginReq>) -> Json<serde_json::Value> {
-    let header = base64_url_encode(r#"{"alg":"HS256","typ":"JWT"}"#);
-    let now = chrono::Utc::now().timestamp();
-    let payload_json = serde_json::json!({
-        "sub": body.username,
-        "name": body.username,
-        "roles": ["admin"],
-        "iat": now,
-        "exp": now + 86400,
-    });
-    let payload = base64_url_encode(&payload_json.to_string());
-    let signature = base64_url_encode("shop-test-signature");
-    let token = format!("{}.{}.{}", header, payload, signature);
+    let jwt = flux_shop::server::jwt::JwtService::shop_test();
+    let role = if body.username == "root" {
+        "admin"
+    } else {
+        "buyer"
+    };
+    let token = jwt.issue(&body.username, &body.username, role).unwrap();
 
     Json(serde_json::json!({
         "access_token": token,
         "token_type": "Bearer",
         "expires_in": 86400,
     }))
-}
-
-fn base64_url_encode(input: &str) -> String {
-    use base64::Engine;
-    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(input.as_bytes())
 }
 
 fn seed_data(kv: &Arc<dyn openerp_kv::KVStore>) {

@@ -10,6 +10,7 @@ pub mod facet_handlers;
 pub mod i18n;
 pub mod jwt;
 pub mod payment;
+pub mod roles;
 pub mod store_impls;
 
 use std::sync::Arc;

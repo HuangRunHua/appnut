@@ -32,8 +32,11 @@ async fn main() -> anyhow::Result<()> {
     seed_data(&kv);
     info!("Seeded test data");
 
-    // AllowAll auth — no JWT needed for admin API.
-    let auth: Arc<dyn openerp_core::Authenticator> = Arc::new(openerp_core::AllowAll);
+    let rbac = openerp_core::RbacAuthenticator::new(
+        flux_golden::server::jwt::GOLDEN_TEST_SECRET,
+        flux_golden::server::roles::twitter_permission_map(),
+    );
+    let auth: Arc<dyn openerp_core::Authenticator> = openerp_core::resolve_auth_mode(rbac);
 
     // Build schema from DSL.
     let schema_json =
@@ -89,33 +92,19 @@ struct LoginReq {
 }
 
 async fn login_handler(Json(body): Json<LoginReq>) -> Json<serde_json::Value> {
-    // Simple JWT: header.payload.signature (HS256 with "secret").
-    // The admin routes use AllowAll, so the token content doesn't matter.
-    // The dashboard just needs it to exist in localStorage.
-    let header = base64_url_encode(r#"{"alg":"HS256","typ":"JWT"}"#);
-    let now = chrono::Utc::now().timestamp();
-    let payload_json = serde_json::json!({
-        "sub": body.username,
-        "name": body.username,
-        "roles": ["admin"],
-        "iat": now,
-        "exp": now + 86400,
-    });
-    let payload = base64_url_encode(&payload_json.to_string());
-    // Fake signature — dashboard doesn't validate, admin uses AllowAll.
-    let signature = base64_url_encode("golden-test-signature");
-    let token = format!("{}.{}.{}", header, payload, signature);
+    let jwt = flux_golden::server::jwt::JwtService::golden_test();
+    let role = if body.username == "root" || body.username == "alice" {
+        "admin"
+    } else {
+        "user"
+    };
+    let token = jwt.issue(&body.username, &body.username, role).unwrap();
 
     Json(serde_json::json!({
         "access_token": token,
         "token_type": "Bearer",
         "expires_in": 86400,
     }))
-}
-
-fn base64_url_encode(input: &str) -> String {
-    use base64::Engine;
-    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(input.as_bytes())
 }
 
 // ── Seed data ──
