@@ -2,7 +2,7 @@
 //!
 //! Scans an `impl` block for methods annotated with `#[handle(ReqType)]`.
 //! Generates a `register(self: &Arc<Self>, flux: &Flux)` method that wires
-//! each handler to the Flux router with automatic payload downcast.
+//! each handler to the Flux router with automatic JSON deserialization.
 //!
 //! Input:
 //! ```ignore
@@ -25,11 +25,11 @@
 //!     pub fn register(self: &::std::sync::Arc<Self>, flux: &::openerp_flux::Flux) {
 //!         {
 //!             let this = ::std::sync::Arc::clone(self);
-//!             flux.on(<LoginReq>::PATH, move |_, payload, store: ::std::sync::Arc<::openerp_flux::StateStore>| {
+//!             flux.on(<LoginReq>::PATH, move |_, json_bytes, store: ::std::sync::Arc<::openerp_flux::StateStore>| {
 //!                 let this = this.clone();
 //!                 async move {
-//!                     let req = payload.downcast_ref::<LoginReq>().unwrap();
-//!                     this.handle_login(req, &store).await;
+//!                     let req: LoginReq = ::serde_json::from_slice(&json_bytes).unwrap();
+//!                     this.handle_login(&req, &store).await;
 //!                 }
 //!             });
 //!         }
@@ -81,11 +81,11 @@ pub fn expand(item: ItemImpl) -> syn::Result<TokenStream> {
         quote! {
             {
                 let this = ::std::sync::Arc::clone(self);
-                flux.on(<#req_type>::PATH, move |_, payload, store: ::std::sync::Arc<::openerp_flux::StateStore>| {
+                flux.on(<#req_type>::PATH, move |_, json_bytes, store: ::std::sync::Arc<::openerp_flux::StateStore>| {
                     let this = this.clone();
                     async move {
-                        let req = payload.downcast_ref::<#req_type>().unwrap();
-                        this.#method_name(req, &store).await;
+                        let req: #req_type = ::serde_json::from_slice(&json_bytes).unwrap();
+                        this.#method_name(&req, &store).await;
                     }
                 });
             }

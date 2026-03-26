@@ -1,0 +1,45 @@
+[package]
+name = "flux-shop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "flux_shop"
+path = "lib.rs"
+
+[[bin]]
+name = "shopd"
+path = "main.rs"
+
+[dependencies]
+anyhow.workspace = true
+async-trait.workspace = true
+axum.workspace = true
+base64.workspace = true
+chrono.workspace = true
+flatbuffers.workspace = true
+flux-derive = { path = "../../../crates/bff/derive" }
+flux-ffi = { path = "../../../crates/bff/ffi" }
+jsonwebtoken.workspace = true
+openerp-blob = { path = "../../../crates/support/blob" }
+openerp-client = { path = "../../../crates/dsl/client" }
+openerp-core = { path = "../../../crates/support/core" }
+openerp-flux = { path = "../../../crates/bff/runtime" }
+openerp-kv = { path = "../../../crates/support/kv" }
+openerp-macro = { path = "../../../crates/dsl/macro" }
+openerp-search = { path = "../../../crates/support/search" }
+openerp-store = { path = "../../../crates/dsl/store" }
+openerp-types = { path = "../../../crates/dsl/types" }
+openerp-web = { path = "../../../crates/dsl/web" }
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+tower.workspace = true

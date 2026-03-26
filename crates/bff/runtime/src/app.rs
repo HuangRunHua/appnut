@@ -1,17 +1,16 @@
-use std::any::Any;
 use std::future::Future;
 use std::sync::Arc;
 
 use crate::router::Router;
 use crate::store::StateStore;
-use crate::value::{StateValue, SubscriptionId};
+use crate::value::SubscriptionId;
 
 /// Flux — the cross-platform state engine.
 ///
 /// Three primitives, all path-based:
-/// - `get(path)` — read state at a path (Arc, zero-copy)
-/// - `emit(path, payload)` — send a request, Trie-routed to handler(s)
-/// - `subscribe(pattern)` — subscribe to state changes, Trie-matched notifications
+/// - `get(path)` — read stored JSON bytes at a path
+/// - `emit(path, payload)` — send a JSON bytes request, Trie-routed to handler(s)
+/// - `subscribe(pattern)` — observe state changes as JSON bytes
 ///
 /// # Examples
 ///
@@ -20,19 +19,22 @@ use crate::value::{StateValue, SubscriptionId};
 ///
 /// // Register a handler.
 /// flux.on("auth/login", |path, payload, store| async move {
-///     store.set("auth/state", "authenticated".to_string());
+///     let req: LoginRequest = serde_json::from_slice(&payload).unwrap();
+///     store.set("auth/state", AuthState { phase: "authenticated" });
 /// });
 ///
 /// // Subscribe to state changes.
-/// flux.subscribe("auth/#", |path, value| {
-///     println!("{} changed", path);
+/// flux.subscribe("auth/#", |path, bytes| {
+///     println!("{} changed ({} bytes)", path, bytes.len());
 /// });
 ///
 /// // Emit a request.
-/// flux.emit("auth/login", LoginRequest { .. }).await;
+/// let payload = serde_json::to_vec(&LoginRequest { .. }).unwrap();
+/// flux.emit("auth/login", &payload).await;
 ///
 /// // Read state.
-/// let state = flux.get("auth/state").unwrap();
+/// let bytes = flux.get("auth/state").unwrap();
+/// let state: AuthState = serde_json::from_slice(&bytes).unwrap();
 /// ```
 pub struct Flux {
     store: Arc<StateStore>,
@@ -52,25 +54,24 @@ impl Flux {
     // State — read
     // ====================================================================
 
-    /// Read the state value at a path.
+    /// Read the stored JSON bytes at a path.
     ///
-    /// Returns `None` if no value is set. The returned `StateValue` is an
-    /// Arc clone (cheap, no data copy). Caller can downcast:
+    /// Returns `None` if no value is set.
     ///
     /// ```ignore
-    /// let v = flux.get("auth/state")?;
-    /// let auth = v.downcast_ref::<AuthState>()?;
+    /// let bytes = flux.get("auth/state")?;
+    /// let auth: AuthState = serde_json::from_slice(&bytes)?;
     /// ```
-    pub fn get(&self, path: &str) -> Option<StateValue> {
+    pub fn get(&self, path: &str) -> Option<Vec<u8>> {
         self.store.get(path)
     }
 
     /// Scan all state entries under a prefix path.
     ///
-    /// Returns entries whose path starts with `{prefix}/`.
+    /// Returns `(path, json_bytes)` pairs whose path starts with `{prefix}/`.
     /// Does NOT include the exact `prefix` path itself.
     /// Results are ordered by path.
-    pub fn scan(&self, prefix: &str) -> Vec<(String, StateValue)> {
+    pub fn scan(&self, prefix: &str) -> Vec<(String, Vec<u8>)> {
         self.store.scan(prefix)
     }
 
@@ -89,8 +90,8 @@ impl Flux {
         self.store.is_empty()
     }
 
-    /// Get a snapshot of all state entries.
-    pub fn snapshot(&self) -> Vec<(String, StateValue)> {
+    /// Get a snapshot of all state entries as `(path, json_bytes)` pairs.
+    pub fn snapshot(&self) -> Vec<(String, Vec<u8>)> {
         self.store.snapshot()
     }
 
@@ -98,23 +99,15 @@ impl Flux {
     // Requests — emit
     // ====================================================================
 
-    /// Emit a request and wait for handler(s) to complete.
+    /// Emit a request with JSON bytes payload.
     ///
-    /// The payload is wrapped in `Arc` and routed to all handlers
-    /// matching the path via Trie pattern matching. Handlers execute
-    /// sequentially.
+    /// The payload is routed to all handlers matching the path via
+    /// Trie pattern matching. Handlers execute sequentially.
     ///
     /// If no handler matches, this is a silent no-op.
-    pub async fn emit<T: Any + Send + Sync>(&self, path: &str, payload: T) {
+    pub async fn emit(&self, path: &str, payload: &[u8]) {
         self.router
-            .dispatch(path, Arc::new(payload), Arc::clone(&self.store))
-            .await;
-    }
-
-    /// Emit a request with a pre-built Arc payload.
-    pub async fn emit_arc(&self, path: &str, payload: Arc<dyn Any + Send + Sync>) {
-        self.router
-            .dispatch(path, payload, Arc::clone(&self.store))
+            .dispatch(path, payload.to_vec(), Arc::clone(&self.store))
             .await;
     }
 
@@ -126,13 +119,13 @@ impl Flux {
     ///
     /// The handler receives:
     /// - `path: String` — the matched request path
-    /// - `payload: Arc<dyn Any + Send + Sync>` — type-erased payload (downcast inside)
+    /// - `payload: Vec<u8>` — JSON-serialized request payload
     /// - `store: Arc<StateStore>` — state store for reading/writing state
     ///
     /// Pattern supports MQTT-style wildcards (`+`, `#`).
     pub fn on<F, Fut>(&self, pattern: &str, handler: F)
     where
-        F: Fn(String, Arc<dyn Any + Send + Sync>, Arc<StateStore>) -> Fut + Send + Sync + 'static,
+        F: Fn(String, Vec<u8>, Arc<StateStore>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = ()> + Send + 'static,
     {
         self.router.on(pattern, handler);
@@ -149,13 +142,14 @@ impl Flux {
 
     /// Subscribe to state changes matching a Trie pattern.
     ///
-    /// The handler is called synchronously on the thread that calls `set`.
+    /// The handler receives the changed path and JSON bytes of the new value.
+    /// Called synchronously on the thread that calls `set`.
     /// Pattern supports MQTT-style wildcards (`+`, `#`).
     ///
     /// Returns a `SubscriptionId` for unsubscribing.
     pub fn subscribe<F>(&self, pattern: &str, handler: F) -> SubscriptionId
     where
-        F: Fn(&str, &StateValue) + Send + Sync + 'static,
+        F: Fn(&str, &[u8]) + Send + Sync + 'static,
     {
         self.store.subscribe(pattern, handler)
     }
@@ -186,6 +180,7 @@ impl Default for Flux {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde::{Deserialize, Serialize};
     use std::sync::atomic::{AtomicU64, Ordering};
 
     // ========================================================================
@@ -215,8 +210,9 @@ mod tests {
         let flux = Flux::new();
         flux.store().set("counter", 42u32);
 
-        let v = flux.get("counter").unwrap();
-        assert_eq!(v.downcast_ref::<u32>(), Some(&42));
+        let bytes = flux.get("counter").unwrap();
+        let v: u32 = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(v, 42);
     }
 
     #[test]
@@ -245,10 +241,10 @@ mod tests {
     #[test]
     fn scan_children() {
         let flux = Flux::new();
-        flux.store().set("items/1", "a".to_string());
-        flux.store().set("items/2", "b".to_string());
-        flux.store().set("items/3", "c".to_string());
-        flux.store().set("other", "x".to_string());
+        flux.store().set("items/1", "a");
+        flux.store().set("items/2", "b");
+        flux.store().set("items/3", "c");
+        flux.store().set("other", "x");
 
         let results = flux.scan("items");
         assert_eq!(results.len(), 3);
@@ -291,20 +287,19 @@ mod tests {
             }
         });
 
-        flux.emit("ping", ()).await;
+        flux.emit("ping", &[]).await;
         assert_eq!(called.load(Ordering::Relaxed), 1);
     }
 
     #[tokio::test]
     async fn emit_no_handler_is_silent() {
         let flux = Flux::new();
-        // Should not panic.
-        flux.emit("nonexistent", ()).await;
+        flux.emit("nonexistent", &[]).await;
     }
 
     #[tokio::test]
-    async fn emit_typed_payload() {
-        #[derive(Debug)]
+    async fn emit_json_payload() {
+        #[derive(Debug, Serialize, Deserialize)]
         struct LoginReq {
             phone: String,
         }
@@ -316,18 +311,16 @@ mod tests {
         flux.on("auth/login", move |_, payload, _| {
             let r = r.clone();
             async move {
-                let req = payload.downcast_ref::<LoginReq>().unwrap();
-                *r.write().unwrap() = req.phone.clone();
+                let req: LoginReq = serde_json::from_slice(&payload).unwrap();
+                *r.write().unwrap() = req.phone;
             }
         });
 
-        flux.emit(
-            "auth/login",
-            LoginReq {
-                phone: "13800138000".into(),
-            },
-        )
-        .await;
+        let payload = serde_json::to_vec(&LoginReq {
+            phone: "13800138000".into(),
+        })
+        .unwrap();
+        flux.emit("auth/login", &payload).await;
 
         assert_eq!(*received.read().unwrap(), "13800138000");
     }
@@ -341,16 +334,14 @@ mod tests {
         let flux = Flux::new();
 
         flux.on("auth/login", |_, _, store: Arc<StateStore>| async move {
-            store.set("auth/state", "authenticated".to_string());
+            store.set("auth/state", "authenticated");
         });
 
-        flux.emit("auth/login", ()).await;
+        flux.emit("auth/login", &[]).await;
 
-        let v = flux.get("auth/state").unwrap();
-        assert_eq!(
-            v.downcast_ref::<String>(),
-            Some(&"authenticated".to_string())
-        );
+        let bytes = flux.get("auth/state").unwrap();
+        let v: String = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(v, "authenticated");
     }
 
     #[tokio::test]
@@ -360,35 +351,22 @@ mod tests {
         flux.on(
             "app/initialize",
             |_, _, store: Arc<StateStore>| async move {
-                store.set("auth/state", "unauthenticated".to_string());
+                store.set("auth/state", "unauthenticated");
                 store.set("auth/terms", false);
-                store.set("app/route", "/onboarding".to_string());
+                store.set("app/route", "/onboarding");
             },
         );
 
-        flux.emit("app/initialize", ()).await;
+        flux.emit("app/initialize", &[]).await;
 
-        assert_eq!(
-            flux.get("auth/state")
-                .unwrap()
-                .downcast_ref::<String>()
-                .unwrap(),
-            "unauthenticated"
-        );
-        assert_eq!(
-            flux.get("auth/terms")
-                .unwrap()
-                .downcast_ref::<bool>()
-                .unwrap(),
-            &false
-        );
-        assert_eq!(
-            flux.get("app/route")
-                .unwrap()
-                .downcast_ref::<String>()
-                .unwrap(),
-            "/onboarding"
-        );
+        let v: String = serde_json::from_slice(&flux.get("auth/state").unwrap()).unwrap();
+        assert_eq!(v, "unauthenticated");
+
+        let v: bool = serde_json::from_slice(&flux.get("auth/terms").unwrap()).unwrap();
+        assert!(!v);
+
+        let v: String = serde_json::from_slice(&flux.get("app/route").unwrap()).unwrap();
+        assert_eq!(v, "/onboarding");
     }
 
     #[tokio::test]
@@ -397,18 +375,19 @@ mod tests {
         flux.store().set("counter", 0u32);
 
         flux.on("increment", |_, _, store: Arc<StateStore>| async move {
-            let current = store
+            let current: u32 = store
                 .get("counter")
-                .and_then(|v| v.downcast_ref::<u32>().copied())
+                .and_then(|bytes| serde_json::from_slice(&bytes).ok())
                 .unwrap_or(0);
             store.set("counter", current + 1);
         });
 
-        flux.emit("increment", ()).await;
-        flux.emit("increment", ()).await;
-        flux.emit("increment", ()).await;
+        flux.emit("increment", &[]).await;
+        flux.emit("increment", &[]).await;
+        flux.emit("increment", &[]).await;
 
-        assert_eq!(flux.get("counter").unwrap().downcast_ref::<u32>(), Some(&3));
+        let v: u32 = serde_json::from_slice(&flux.get("counter").unwrap()).unwrap();
+        assert_eq!(v, 3);
     }
 
     // ========================================================================
@@ -421,15 +400,15 @@ mod tests {
         let notified = Arc::new(AtomicU64::new(0));
         let n = notified.clone();
 
-        flux.subscribe("auth/state", move |_path, _value| {
+        flux.subscribe("auth/state", move |_path, _bytes| {
             n.fetch_add(1, Ordering::Relaxed);
         });
 
         flux.on("auth/login", |_, _, store: Arc<StateStore>| async move {
-            store.set("auth/state", "authenticated".to_string());
+            store.set("auth/state", "authenticated");
         });
 
-        flux.emit("auth/login", ()).await;
+        flux.emit("auth/login", &[]).await;
         assert_eq!(notified.load(Ordering::Relaxed), 1);
     }
 
@@ -439,20 +418,20 @@ mod tests {
         let paths_changed = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
         let pc = paths_changed.clone();
 
-        flux.subscribe("#", move |path, _value| {
+        flux.subscribe("#", move |path, _bytes| {
             pc.lock().unwrap().push(path.to_string());
         });
 
         flux.on(
             "app/initialize",
             |_, _, store: Arc<StateStore>| async move {
-                store.set("auth/state", "unauthenticated".to_string());
+                store.set("auth/state", "unauthenticated");
                 store.set("auth/terms", false);
-                store.set("app/route", "/onboarding".to_string());
+                store.set("app/route", "/onboarding");
             },
         );
 
-        flux.emit("app/initialize", ()).await;
+        flux.emit("app/initialize", &[]).await;
 
         let paths = paths_changed.lock().unwrap();
         assert_eq!(paths.len(), 3);
@@ -467,16 +446,16 @@ mod tests {
         let received = Arc::new(std::sync::RwLock::new(None::<String>));
         let r = received.clone();
 
-        flux.subscribe("auth/state", move |_path, value| {
-            let s = value.downcast_ref::<String>().unwrap().clone();
+        flux.subscribe("auth/state", move |_path, bytes| {
+            let s: String = serde_json::from_slice(bytes).unwrap();
             *r.write().unwrap() = Some(s);
         });
 
         flux.on("auth/login", |_, _, store: Arc<StateStore>| async move {
-            store.set("auth/state", "authenticated".to_string());
+            store.set("auth/state", "authenticated");
         });
 
-        flux.emit("auth/login", ()).await;
+        flux.emit("auth/login", &[]).await;
         assert_eq!(*received.read().unwrap(), Some("authenticated".to_string()));
     }
 
@@ -490,20 +469,20 @@ mod tests {
         let count = Arc::new(AtomicU64::new(0));
         let c = count.clone();
 
-        let id = flux.subscribe("auth/state", move |_, _| {
+        let id = flux.subscribe("auth/state", move |_, _bytes| {
             c.fetch_add(1, Ordering::Relaxed);
         });
 
         flux.on("update", |_, _, store: Arc<StateStore>| async move {
-            store.set("auth/state", "x".to_string());
+            store.set("auth/state", "x");
         });
 
-        flux.emit("update", ()).await;
+        flux.emit("update", &[]).await;
         assert_eq!(count.load(Ordering::Relaxed), 1);
 
         flux.unsubscribe("auth/state", id);
-        flux.emit("update", ()).await;
-        assert_eq!(count.load(Ordering::Relaxed), 1); // not incremented
+        flux.emit("update", &[]).await;
+        assert_eq!(count.load(Ordering::Relaxed), 1);
     }
 
     // ========================================================================
@@ -530,11 +509,11 @@ mod tests {
     }
 
     // ========================================================================
-    // emit_arc
+    // emit with pre-serialized bytes
     // ========================================================================
 
     #[tokio::test]
-    async fn emit_arc_payload() {
+    async fn emit_prebuilt_bytes() {
         let flux = Flux::new();
         let called = Arc::new(AtomicU64::new(0));
         let called_c = called.clone();
@@ -542,13 +521,14 @@ mod tests {
         flux.on("test", move |_, payload, _| {
             let called = called_c.clone();
             async move {
-                assert_eq!(payload.downcast_ref::<u32>(), Some(&42));
+                let v: u32 = serde_json::from_slice(&payload).unwrap();
+                assert_eq!(v, 42);
                 called.fetch_add(1, Ordering::Relaxed);
             }
         });
 
-        let payload: Arc<dyn Any + Send + Sync> = Arc::new(42u32);
-        flux.emit_arc("test", payload).await;
+        let bytes = serde_json::to_vec(&42u32).unwrap();
+        flux.emit("test", &bytes).await;
         assert_eq!(called.load(Ordering::Relaxed), 1);
     }
 
@@ -558,25 +538,24 @@ mod tests {
 
     #[tokio::test]
     async fn full_flow_initialize_accept_terms_login() {
-        #[derive(Debug, Clone, PartialEq)]
+        #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
         struct AuthState {
             phase: String,
             busy: bool,
         }
 
-        #[derive(Debug, Clone, PartialEq)]
+        #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
         struct TermsState {
             accepted: bool,
         }
 
-        #[derive(Debug)]
+        #[derive(Debug, Serialize, Deserialize)]
         struct AcceptTermsReq {
             accepted: bool,
         }
 
         let flux = Flux::new();
 
-        // Handler: app/initialize
         flux.on(
             "app/initialize",
             |_, _, store: Arc<StateStore>| async move {
@@ -588,15 +567,14 @@ mod tests {
                     },
                 );
                 store.set("auth/terms", TermsState { accepted: false });
-                store.set("app/route", "/onboarding".to_string());
+                store.set("app/route", "/onboarding");
             },
         );
 
-        // Handler: auth/accept-terms
         flux.on(
             "auth/accept-terms",
             |_, payload, store: Arc<StateStore>| async move {
-                let req = payload.downcast_ref::<AcceptTermsReq>().unwrap();
+                let req: AcceptTermsReq = serde_json::from_slice(&payload).unwrap();
                 store.set(
                     "auth/terms",
                     TermsState {
@@ -604,12 +582,11 @@ mod tests {
                     },
                 );
                 if req.accepted {
-                    store.set("app/route", "/login".to_string());
+                    store.set("app/route", "/login");
                 }
             },
         );
 
-        // Handler: auth/login
         flux.on("auth/login", |_, _, store: Arc<StateStore>| async move {
             store.set(
                 "auth/state",
@@ -618,69 +595,48 @@ mod tests {
                     busy: false,
                 },
             );
-            store.set("app/route", "/home".to_string());
+            store.set("app/route", "/home");
         });
 
-        // Track all state changes.
         let timeline = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
         let tl = timeline.clone();
-        flux.subscribe("#", move |path, _| {
+        flux.subscribe("#", move |path, _bytes| {
             tl.lock().unwrap().push(path.to_string());
         });
 
-        // === Execute flow ===
-
         // 1. Initialize
-        flux.emit("app/initialize", ()).await;
+        flux.emit("app/initialize", &[]).await;
 
-        let auth = flux.get("auth/state").unwrap();
-        assert_eq!(
-            auth.downcast_ref::<AuthState>().unwrap().phase,
-            "unauthenticated"
-        );
-        let terms = flux.get("auth/terms").unwrap();
-        assert!(!terms.downcast_ref::<TermsState>().unwrap().accepted);
-        assert_eq!(
-            flux.get("app/route")
-                .unwrap()
-                .downcast_ref::<String>()
-                .unwrap(),
-            "/onboarding"
-        );
+        let auth: AuthState = serde_json::from_slice(&flux.get("auth/state").unwrap()).unwrap();
+        assert_eq!(auth.phase, "unauthenticated");
+
+        let terms: TermsState = serde_json::from_slice(&flux.get("auth/terms").unwrap()).unwrap();
+        assert!(!terms.accepted);
+
+        let route: String = serde_json::from_slice(&flux.get("app/route").unwrap()).unwrap();
+        assert_eq!(route, "/onboarding");
 
         // 2. Accept terms
-        flux.emit("auth/accept-terms", AcceptTermsReq { accepted: true })
-            .await;
+        let payload = serde_json::to_vec(&AcceptTermsReq { accepted: true }).unwrap();
+        flux.emit("auth/accept-terms", &payload).await;
 
-        let terms = flux.get("auth/terms").unwrap();
-        assert!(terms.downcast_ref::<TermsState>().unwrap().accepted);
-        assert_eq!(
-            flux.get("app/route")
-                .unwrap()
-                .downcast_ref::<String>()
-                .unwrap(),
-            "/login"
-        );
+        let terms: TermsState = serde_json::from_slice(&flux.get("auth/terms").unwrap()).unwrap();
+        assert!(terms.accepted);
+
+        let route: String = serde_json::from_slice(&flux.get("app/route").unwrap()).unwrap();
+        assert_eq!(route, "/login");
 
         // 3. Login
-        flux.emit("auth/login", ()).await;
+        flux.emit("auth/login", &[]).await;
 
-        let auth = flux.get("auth/state").unwrap();
-        assert_eq!(
-            auth.downcast_ref::<AuthState>().unwrap().phase,
-            "authenticated"
-        );
-        assert_eq!(
-            flux.get("app/route")
-                .unwrap()
-                .downcast_ref::<String>()
-                .unwrap(),
-            "/home"
-        );
+        let auth: AuthState = serde_json::from_slice(&flux.get("auth/state").unwrap()).unwrap();
+        assert_eq!(auth.phase, "authenticated");
 
-        // Verify timeline captured all changes.
+        let route: String = serde_json::from_slice(&flux.get("app/route").unwrap()).unwrap();
+        assert_eq!(route, "/home");
+
         let tl = timeline.lock().unwrap();
-        assert!(tl.len() >= 7); // at least 3 + 2 + 2 state changes
+        assert!(tl.len() >= 7);
     }
 
     // ========================================================================

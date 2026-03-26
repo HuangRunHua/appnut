@@ -50,6 +50,7 @@
 
 pub mod app;
 pub mod i18n;
+pub mod module;
 pub mod router;
 pub mod store;
 pub mod trie;
@@ -58,6 +59,7 @@ pub mod value;
 // Re-export primary types at crate root.
 pub use app::Flux;
 pub use i18n::{I18nHandler, I18nStore, QueryParams};
+pub use module::FluxModule;
 pub use router::{BoxFuture, Router};
 pub use store::{ChangeHandler, StateStore};
 pub use value::{StateValue, SubscriptionId};

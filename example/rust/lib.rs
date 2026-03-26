@@ -5,6 +5,7 @@
 //! - `bff/dsl/state/` — BFF state definitions (golden ref for #[state] macro)
 //! - `bff/dsl/request/` — BFF request definitions (golden ref for #[request] macro)
 //! - `bff/src/` — handler implementations (golden ref for #[flux_handlers] macro)
+//! - `module.rs` — FluxModule + ServerModule implementation (plugin registration)
 
 // Backend.
 #[path = "server/src/mod.rs"]
@@ -21,3 +22,8 @@ pub mod request;
 // BFF handler implementations + Flux wiring.
 #[path = "bff/src/mod.rs"]
 pub mod handlers;
+
+// Plugin registration — FluxModule + ServerModule implementation.
+pub mod module;
+
+pub use module::{TwitterModule, register_twitter_module};
