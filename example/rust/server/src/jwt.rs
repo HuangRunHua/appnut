@@ -12,6 +12,8 @@ pub struct Claims {
     pub sub: String,
     /// Display name.
     pub name: String,
+    /// Role (e.g. "admin", "user").
+    pub role: String,
     /// Issued at (unix timestamp).
     pub iat: i64,
     /// Expiration (unix timestamp).
@@ -51,11 +53,12 @@ impl JwtService {
     }
 
     /// Issue a signed JWT for a user.
-    pub fn issue(&self, user_id: &str, display_name: &str) -> Result<String, String> {
+    pub fn issue(&self, user_id: &str, display_name: &str, role: &str) -> Result<String, String> {
         let now = chrono::Utc::now().timestamp();
         let claims = Claims {
             sub: user_id.to_string(),
             name: display_name.to_string(),
+            role: role.to_string(),
             iat: now,
             exp: now + self.expire_secs,
         };
@@ -83,10 +86,11 @@ mod tests {
     #[test]
     fn issue_and_verify() {
         let svc = JwtService::golden_test();
-        let token = svc.issue("alice", "Alice Wang").unwrap();
+        let token = svc.issue("alice", "Alice Wang", "user").unwrap();
         let claims = svc.verify(&token).unwrap();
         assert_eq!(claims.sub, "alice");
         assert_eq!(claims.name, "Alice Wang");
+        assert_eq!(claims.role, "user");
     }
 
     #[test]
@@ -100,15 +104,15 @@ mod tests {
     fn verify_wrong_secret_rejected() {
         let issuer = JwtService::new("secret-a", 3600);
         let verifier = JwtService::new("secret-b", 3600);
-        let token = issuer.issue("alice", "Alice").unwrap();
+        let token = issuer.issue("alice", "Alice", "user").unwrap();
         let result = verifier.verify(&token);
         assert!(result.is_err());
     }
 
     #[test]
     fn verify_expired_token_rejected() {
-        let svc = JwtService::new(GOLDEN_TEST_SECRET, -120); // Expired 2 minutes ago (past leeway).
-        let token = svc.issue("alice", "Alice").unwrap();
+        let svc = JwtService::new(GOLDEN_TEST_SECRET, -120);
+        let token = svc.issue("alice", "Alice", "user").unwrap();
         let result = svc.verify(&token);
         assert!(result.is_err());
     }

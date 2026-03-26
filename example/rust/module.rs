@@ -84,7 +84,12 @@ impl ServerModule for TwitterModule {
     }
 
     fn admin_router(&self, ctx: &ServerContext) -> axum::Router {
-        server::admin_router(ctx.kv.clone(), ctx.auth.clone())
+        let rbac = openerp_core::RbacAuthenticator::new(
+            server::jwt::GOLDEN_TEST_SECRET,
+            server::roles::twitter_permission_map(),
+        );
+        let auth = openerp_core::resolve_auth_mode(rbac);
+        server::admin_router(ctx.kv.clone(), auth)
     }
 
     fn seed_data(&self, ctx: &ServerContext) {

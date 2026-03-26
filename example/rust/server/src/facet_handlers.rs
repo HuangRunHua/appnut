@@ -153,9 +153,14 @@ pub async fn login(
     }
 
     let display = user.display_name.as_deref().unwrap_or(&user.username);
+    let role = if user.username == "alice" {
+        "admin"
+    } else {
+        "user"
+    };
     let token = state
         .jwt
-        .issue(user.id.as_str(), display)
+        .issue(user.id.as_str(), display, role)
         .map_err(ServiceError::Internal)?;
 
     Ok(Json(LoginResponse {
@@ -877,7 +882,7 @@ mod tests {
     async fn wrong_secret_rejected() {
         let (r, _) = setup();
         let wrong = JwtService::new("wrong-secret", 3600);
-        let token = wrong.issue("alice", "Alice").unwrap();
+        let token = wrong.issue("alice", "Alice", "user").unwrap();
         let (s, body) = call(&r, "GET", "/me", Some(&token), None).await;
         assert_eq!(s, StatusCode::UNAUTHORIZED);
         assert_eq!(body["code"], "UNAUTHENTICATED");
@@ -888,7 +893,7 @@ mod tests {
     #[tokio::test]
     async fn get_me_success() {
         let (r, jwt) = setup();
-        let token = jwt.issue("alice", "Alice").unwrap();
+        let token = jwt.issue("alice", "Alice", "user").unwrap();
         let (s, body) = call(&r, "GET", "/me", Some(&token), None).await;
         assert_eq!(s, StatusCode::OK);
         assert_eq!(body["username"], "alice");
@@ -900,7 +905,7 @@ mod tests {
     #[tokio::test]
     async fn empty_timeline() {
         let (r, jwt) = setup();
-        let token = jwt.issue("alice", "Alice").unwrap();
+        let token = jwt.issue("alice", "Alice", "user").unwrap();
         let (s, body) = call(
             &r,
             "POST",
@@ -918,7 +923,7 @@ mod tests {
     #[tokio::test]
     async fn create_and_list_tweet() {
         let (r, jwt) = setup();
-        let token = jwt.issue("alice", "Alice").unwrap();
+        let token = jwt.issue("alice", "Alice", "user").unwrap();
 
         // Create.
         let (s, tweet) = call(
@@ -949,7 +954,7 @@ mod tests {
     #[tokio::test]
     async fn create_empty_tweet_rejected() {
         let (r, jwt) = setup();
-        let token = jwt.issue("alice", "Alice").unwrap();
+        let token = jwt.issue("alice", "Alice", "user").unwrap();
         let (s, body) = call(
             &r,
             "POST",
@@ -965,7 +970,7 @@ mod tests {
     #[tokio::test]
     async fn create_long_tweet_rejected() {
         let (r, jwt) = setup();
-        let token = jwt.issue("alice", "Alice").unwrap();
+        let token = jwt.issue("alice", "Alice", "user").unwrap();
         let long = "x".repeat(281);
         let (s, body) = call(
             &r,
@@ -984,7 +989,7 @@ mod tests {
     #[tokio::test]
     async fn like_and_unlike() {
         let (r, jwt) = setup();
-        let token = jwt.issue("alice", "Alice").unwrap();
+        let token = jwt.issue("alice", "Alice", "user").unwrap();
 
         // Create tweet.
         let (_, tweet) = call(
@@ -1039,7 +1044,7 @@ mod tests {
     #[tokio::test]
     async fn follow_and_unfollow() {
         let (r, jwt) = setup();
-        let token = jwt.issue("alice", "Alice").unwrap();
+        let token = jwt.issue("alice", "Alice", "user").unwrap();
 
         // Follow bob.
         let (s, profile) = call(&r, "POST", "/users/bob/follow", Some(&token), None).await;
@@ -1062,7 +1067,7 @@ mod tests {
     #[tokio::test]
     async fn view_user_profile() {
         let (r, jwt) = setup();
-        let token = jwt.issue("alice", "Alice").unwrap();
+        let token = jwt.issue("alice", "Alice", "user").unwrap();
         let (s, resp) = call(&r, "POST", "/users/bob/profile", Some(&token), None).await;
         assert_eq!(s, StatusCode::OK);
         assert_eq!(resp["user"]["username"], "bob");
@@ -1072,7 +1077,7 @@ mod tests {
     #[tokio::test]
     async fn view_nonexistent_user() {
         let (r, jwt) = setup();
-        let token = jwt.issue("alice", "Alice").unwrap();
+        let token = jwt.issue("alice", "Alice", "user").unwrap();
         let (s, body) = call(&r, "POST", "/users/nobody/profile", Some(&token), None).await;
         assert_eq!(s, StatusCode::NOT_FOUND);
         assert_eq!(body["code"], "NOT_FOUND");
@@ -1083,7 +1088,7 @@ mod tests {
     #[tokio::test]
     async fn update_my_profile() {
         let (r, jwt) = setup();
-        let token = jwt.issue("alice", "Alice").unwrap();
+        let token = jwt.issue("alice", "Alice", "user").unwrap();
         let (s, updated) = call(
             &r,
             "PUT",
@@ -1104,7 +1109,7 @@ mod tests {
     #[tokio::test]
     async fn update_empty_name_rejected() {
         let (r, jwt) = setup();
-        let token = jwt.issue("alice", "Alice").unwrap();
+        let token = jwt.issue("alice", "Alice", "user").unwrap();
         let (s, body) = call(
             &r,
             "PUT",
@@ -1122,7 +1127,7 @@ mod tests {
     #[tokio::test]
     async fn reply_to_tweet() {
         let (r, jwt) = setup();
-        let token = jwt.issue("alice", "Alice").unwrap();
+        let token = jwt.issue("alice", "Alice", "user").unwrap();
 
         // Create parent.
         let (_, parent) = call(
@@ -1165,7 +1170,7 @@ mod tests {
     #[tokio::test]
     async fn search_users_and_tweets() {
         let (r, jwt) = setup();
-        let token = jwt.issue("alice", "Alice").unwrap();
+        let token = jwt.issue("alice", "Alice", "user").unwrap();
 
         // Create a tweet.
         call(
@@ -1205,8 +1210,8 @@ mod tests {
     #[tokio::test]
     async fn two_users_like_same_tweet() {
         let (r, jwt) = setup();
-        let alice_token = jwt.issue("alice", "Alice").unwrap();
-        let bob_token = jwt.issue("bob", "Bob").unwrap();
+        let alice_token = jwt.issue("alice", "Alice", "user").unwrap();
+        let bob_token = jwt.issue("bob", "Bob", "user").unwrap();
 
         // Alice creates tweet.
         let (_, tweet) = call(
@@ -1267,7 +1272,7 @@ mod tests {
     #[tokio::test]
     async fn timeline_pagination() {
         let (r, jwt) = setup();
-        let token = jwt.issue("alice", "Alice").unwrap();
+        let token = jwt.issue("alice", "Alice", "user").unwrap();
 
         // Create 5 tweets.
         for i in 0..5 {
@@ -1322,7 +1327,7 @@ mod tests {
     #[tokio::test]
     async fn timeline_default_pagination() {
         let (r, jwt) = setup();
-        let token = jwt.issue("alice", "Alice").unwrap();
+        let token = jwt.issue("alice", "Alice", "user").unwrap();
 
         // Create 3 tweets.
         for i in 0..3 {
@@ -1353,7 +1358,7 @@ mod tests {
     #[tokio::test]
     async fn timeline_offset_beyond_total() {
         let (r, jwt) = setup();
-        let token = jwt.issue("alice", "Alice").unwrap();
+        let token = jwt.issue("alice", "Alice", "user").unwrap();
 
         call(
             &r,
@@ -1381,7 +1386,7 @@ mod tests {
     #[tokio::test]
     async fn update_profile_with_correct_timestamp() {
         let (r, jwt) = setup();
-        let token = jwt.issue("alice", "Alice").unwrap();
+        let token = jwt.issue("alice", "Alice", "user").unwrap();
 
         // Get current profile to get updatedAt.
         let (_, me) = call(&r, "GET", "/me", Some(&token), None).await;
@@ -1407,7 +1412,7 @@ mod tests {
     #[tokio::test]
     async fn update_profile_with_stale_timestamp_rejected() {
         let (r, jwt) = setup();
-        let token = jwt.issue("alice", "Alice").unwrap();
+        let token = jwt.issue("alice", "Alice", "user").unwrap();
 
         // First update (to change the updatedAt).
         let (_, me) = call(&r, "GET", "/me", Some(&token), None).await;
@@ -1449,7 +1454,7 @@ mod tests {
     #[tokio::test]
     async fn upload_image() {
         let (r, jwt) = setup();
-        let token = jwt.issue("alice", "Alice").unwrap();
+        let token = jwt.issue("alice", "Alice", "user").unwrap();
 
         let image_data = vec![0xFFu8, 0xD8, 0xFF, 0xE0]; // fake JPEG header
         let req = Request::builder()
@@ -1476,7 +1481,7 @@ mod tests {
     #[tokio::test]
     async fn upload_empty_file_rejected() {
         let (r, jwt) = setup();
-        let token = jwt.issue("alice", "Alice").unwrap();
+        let token = jwt.issue("alice", "Alice", "user").unwrap();
 
         let req = Request::builder()
             .method("POST")
@@ -1503,7 +1508,7 @@ mod tests {
     #[tokio::test]
     async fn update_profile_without_timestamp_still_works() {
         let (r, jwt) = setup();
-        let token = jwt.issue("alice", "Alice").unwrap();
+        let token = jwt.issue("alice", "Alice", "user").unwrap();
 
         let (s, _) = call(
             &r,
@@ -1649,7 +1654,7 @@ mod tests {
     #[tokio::test]
     async fn inbox_returns_messages_in_english() {
         let (r, jwt, _) = setup_with_messages();
-        let token = jwt.issue("alice", "Alice").unwrap();
+        let token = jwt.issue("alice", "Alice", "user").unwrap();
         let (s, body) = call_with_lang(&r, "POST", "/inbox", Some(&token), "en", None).await;
         assert_eq!(s, StatusCode::OK);
         let msgs = body["messages"].as_array().unwrap();
@@ -1671,7 +1676,7 @@ mod tests {
     #[tokio::test]
     async fn inbox_returns_messages_in_chinese() {
         let (r, jwt, _) = setup_with_messages();
-        let token = jwt.issue("alice", "Alice").unwrap();
+        let token = jwt.issue("alice", "Alice", "user").unwrap();
         let (s, body) = call_with_lang(&r, "POST", "/inbox", Some(&token), "zh-CN", None).await;
         assert_eq!(s, StatusCode::OK);
         let msgs = body["messages"].as_array().unwrap();
@@ -1685,7 +1690,7 @@ mod tests {
     #[tokio::test]
     async fn inbox_japanese_fallback_to_english() {
         let (r, jwt, _) = setup_with_messages();
-        let token = jwt.issue("alice", "Alice").unwrap();
+        let token = jwt.issue("alice", "Alice", "user").unwrap();
         let (s, body) = call_with_lang(&r, "POST", "/inbox", Some(&token), "ja", None).await;
         assert_eq!(s, StatusCode::OK);
         let msgs = body["messages"].as_array().unwrap();
@@ -1699,7 +1704,7 @@ mod tests {
     #[tokio::test]
     async fn inbox_bob_only_sees_broadcast() {
         let (r, jwt, _) = setup_with_messages();
-        let token = jwt.issue("bob", "Bob").unwrap();
+        let token = jwt.issue("bob", "Bob", "user").unwrap();
         let (s, body) = call_with_lang(&r, "POST", "/inbox", Some(&token), "en", None).await;
         assert_eq!(s, StatusCode::OK);
         let msgs = body["messages"].as_array().unwrap();
@@ -1711,7 +1716,7 @@ mod tests {
     #[tokio::test]
     async fn mark_read_updates_message() {
         let (r, jwt, _) = setup_with_messages();
-        let token = jwt.issue("alice", "Alice").unwrap();
+        let token = jwt.issue("alice", "Alice", "user").unwrap();
 
         let (_, body) = call_with_lang(&r, "POST", "/inbox", Some(&token), "en", None).await;
         let msgs = body["messages"].as_array().unwrap();
